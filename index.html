@@ -1014,8 +1014,6 @@
 
         const playGainAnimation = (gains, prevLevels) => {
           if (!gains || !Object.keys(gains).length) return;
-          const summary = Object.entries(gains).map(([k,v]) => `${DIMENSIONS.find(d=>d.key===k)?.label||k}+${v}`).join(' / ');
-          spawnFX('gain-burst', summary);
           flyGainsToRadar(gains);
           playXpTicker(gains);
           playLevelUp(prevLevels);
