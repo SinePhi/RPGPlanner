@@ -930,8 +930,19 @@
               return;
             }
             const { db } = await ensureFirebase();
+            const docRef = db.collection('users').doc(id);
+            const snap = await docRef.get();
+            const remoteTime = Number(snap.data()?.lastUpdated || 0);
+            const localTime = Number(state.lastUpdated || 0);
+            if (remoteTime && remoteTime > localTime) {
+              const proceed = confirm('云端有更新，是否覆盖云端为当前本地数据？建议先“连接 / 手动同步”以拉取最新。');
+              if (!proceed) {
+                updateCloudStatus('已取消上传，保留云端较新数据');
+                return;
+              }
+            }
             const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId };
-            await db.collection('users').doc(id).set(payload, { merge: true });
+            await docRef.set(payload, { merge: true });
             state.lastUpdated = payload.lastUpdated;
             updateCloudStatus('已同步至云端');
           } catch (err) {
@@ -943,16 +954,17 @@
         const saveRemoteDebounced = debounce(saveRemote, 1200);
 
         const mergeRemote = (remote) => {
-          if (!remote) return;
+          if (!remote) return false;
           const remoteTime = Number(remote.lastUpdated || 0);
           const localTime = Number(state.lastUpdated || 0);
-          if (remoteTime && remoteTime < localTime) return; // 保留较新的本地
+          if (remoteTime && remoteTime < localTime) return false; // 保留较新的本地
           state.tasks = Array.isArray(remote.tasks) ? remote.tasks : state.tasks;
           state.stats = { ...state.stats, ...(remote.stats || {}) };
           state.settings = { ...state.settings, ...(remote.settings || {}) };
           state.selectedDate = remote.selectedDate ? parseDate(remote.selectedDate) : state.selectedDate;
           state.monthCursor = remote.monthCursor ? parseDate(remote.monthCursor) : state.monthCursor;
           state.lastUpdated = remoteTime || state.lastUpdated;
+          return true;
         };
 
         const loadRemote = async () => {
@@ -967,8 +979,21 @@
             const { db } = await ensureFirebase();
             const snap = await db.collection('users').doc(id).get();
             if (snap.exists) {
-              mergeRemote(snap.data());
-              updateCloudStatus('已从云端加载');
+              const remote = snap.data();
+              const remoteTime = Number(remote.lastUpdated || 0);
+              const localTime = Number(state.lastUpdated || 0);
+              if (remoteTime > localTime) {
+                const accept = confirm('检测到云端有较新数据，是否加载并覆盖本地？');
+                if (accept) {
+                  mergeRemote(remote);
+                  updateCloudStatus('已从云端加载较新数据');
+                } else {
+                  updateCloudStatus('已保留本地数据，未覆盖云端');
+                }
+              } else {
+                mergeRemote(remote);
+                updateCloudStatus('已从云端加载');
+              }
               if (!state.settings.apiUrl || !state.settings.apiKey) {
                 updateCloudStatus('该 ID 未设置 API，请在设置中填写 API URL/Key 后使用打分', true);
               }
@@ -1031,8 +1056,21 @@
               await docRef.set({ ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId });
               updateCloudStatus('已创建新 ID 并同步');
             } else {
-              mergeRemote(snap.data());
-              updateCloudStatus('已加载云端数据');
+              const remote = snap.data();
+              const remoteTime = Number(remote.lastUpdated || 0);
+              const localTime = Number(state.lastUpdated || 0);
+              if (remoteTime > localTime) {
+                const accept = confirm('检测到云端有较新数据，是否加载并覆盖本地？');
+                if (accept) {
+                  mergeRemote(remote);
+                  updateCloudStatus('已加载云端数据');
+                } else {
+                  updateCloudStatus('已保留本地，未覆盖云端');
+                }
+              } else {
+                mergeRemote(remote);
+                updateCloudStatus('已加载云端数据');
+              }
             }
             renderStats();
             renderCalendar();
