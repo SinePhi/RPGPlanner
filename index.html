@@ -1,0 +1,2652 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Persona Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&family=Bangers&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0b0a0f;
+      --ink: #0d0d0d;
+      --card: #15141b;
+      --accent: #ffce00;
+      --glow-accent: rgba(255, 206, 0, 0.45);
+      --warm: #ffd54f;
+      --accent-2: #fffae5;
+      --muted: #7c7a86;
+      --glow: 0 0 20px rgba(229, 0, 42, 0.45);
+      --radius: 14px;
+      --poly-a: polygon(6% 10%, 92% 4%, 96% 68%, 8% 96%);
+      --poly-b: polygon(10% 6%, 88% 2%, 98% 76%, 12% 100%);
+      --poly-c: polygon(4% 8%, 94% 0%, 100% 72%, 6% 94%);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 20%, rgba(229,0,42,0.25), transparent 35%),
+                  radial-gradient(circle at 80% 10%, rgba(255,255,255,0.1), transparent 30%),
+                  linear-gradient(135deg, #0b0a0f 0%, #0f0f16 40%, #0a0a0d 100%);
+      color: #f7f7f7;
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      padding: 18px;
+      background-attachment: fixed;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .hero {
+      position: relative;
+      padding: 18px;
+      background: linear-gradient(120deg, rgba(229,0,42,0.16), rgba(229,0,42,0.05));
+      border: 1px solid rgba(229,0,42,0.45);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--glow);
+      animation: pulse 6s ease-in-out infinite;
+      isolation: isolate;
+    }
+
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 20px rgba(229,0,42,0.35); }
+      50% { box-shadow: 0 0 32px rgba(229,0,42,0.6); }
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: -40% 30%;
+      background: repeating-linear-gradient(-75deg, rgba(255,255,255,0.07) 0 10px, transparent 10px 20px);
+      transform: skewX(-8deg);
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-family: 'Bangers', 'Bebas Neue', 'Space Grotesk', sans-serif;
+      letter-spacing: 1.2px;
+      font-size: 36px;
+      text-transform: uppercase;
+      display: inline-block;
+      padding: 4px 10px;
+      color: #fff;
+      position: relative;
+      z-index: 1;
+      transform: rotate(-1.2deg);
+      box-shadow: 6px 6px 0 #000;
+    }
+    h1::before {
+      content: '';
+      position: absolute;
+      inset: -6px -10px;
+      background: #b00020;
+      z-index: -1;
+      clip-path: var(--poly-a);
+      animation: titleShift 2s ease-in-out infinite alternate;
+    }
+    @keyframes titleShift {
+      0% { clip-path: var(--poly-a); }
+      50% { clip-path: var(--poly-b); }
+      100% { clip-path: var(--poly-c); }
+    }
+
+    .subtitle { color: var(--muted); margin: 0; }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid #1f1e26;
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .panel::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, rgba(229,0,42,0.08), transparent 40%);
+    }
+
+    .panel:hover { transform: translateY(-2px); border-color: rgba(229,0,42,0.4); box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
+
+    .panel h2 {
+      font-family: 'Bangers', 'Bebas Neue', 'Space Grotesk', sans-serif;
+      letter-spacing: 0.8px;
+      margin: 0 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 22px;
+      border: 1px solid #b00020;
+      background: #000;
+      color: #fff;
+      box-shadow: 4px 4px 0 #b00020, 7px 7px 0 #000;
+      transform: rotate(-0.6deg);
+      position: relative;
+      overflow: visible;
+    }
+    .panel h2 .accent { color: #e5002a; }
+    .panel h2::before {
+      content: '';
+      position: absolute;
+      inset: -6px -8px;
+      background: #000;
+      border: 1px solid #b00020;
+      clip-path: var(--poly-a);
+      z-index: -1;
+    }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .stat {
+      background: #0f0e15;
+      border: 1px solid #1f1d24;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .stat .label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+    .bar { height: 8px; background: #1f1d24; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .bar span { display: block; height: 100%; background: linear-gradient(90deg, #ffb300, #ffe082); box-shadow: 0 0 12px rgba(255, 197, 66, 0.6); transition: width 0.45s ease; }
+    #radarCanvas { width: 100%; height: 260px; display: block; margin-top: 10px; }
+
+    /* Calendar */
+    .calendar-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; position: relative; }
+    .calendar-header .close { position: static; margin-left: auto; }
+    /* Base button styling (except close / floating) */
+    button:not(.close):not(.ghost-btn):not(.fab) {
+      display: inline-block;
+      border: 1px solid #b00020;
+      background: #000;
+      color: #fff;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      font-weight: 700;
+      clip-path: var(--poly-a);
+      box-shadow: 2px 2px 0 #b00020, 4px 4px 0 #000;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+    }
+    button:not(.close):not(.ghost-btn):not(.fab):hover { border-color: #ffce00; color: #ffce00; box-shadow: 2px 2px 0 #ffce00, 4px 4px 0 #000; }
+
+    .calendar-header button {
+      padding: 8px 14px;
+    }
+    .calendar-header button:hover { border-color: #ffce00; color: #ffce00; box-shadow: 2px 2px 0 #ffce00, 4px 4px 0 #000; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .weekday { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+    .day {
+      background: #0f0e15;
+      border: 1px solid #1f1d24;
+      border-radius: 12px;
+      padding: 10px 8px;
+      min-height: 70px;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    /* Irregular overlay hover effect */
+    button::after,
+    .ghost-btn::after,
+    .fab::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 2px solid #fff;
+      background: transparent;
+      clip-path: var(--poly-a);
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: normal;
+      transition: opacity 0.15s ease, clip-path 0.6s ease;
+      z-index: 2;
+      animation: none;
+    }
+    button:hover::after,
+    button:focus-visible::after,
+    button:active::after,
+    .ghost-btn:hover::after,
+    .ghost-btn:focus-visible::after,
+    .ghost-btn:active::after,
+    .fab:hover::after,
+    .fab:focus-visible::after,
+    .fab:active::after {
+      opacity: 1;
+      animation: polyRandom 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes polyRandom {
+      0% { clip-path: var(--poly-a); }
+      33% { clip-path: var(--poly-b); }
+      66% { clip-path: var(--poly-c); }
+      100% { clip-path: polygon(12% 8%, 90% 2%, 98% 78%, 8% 96%); }
+    }
+    .day:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .day .num { font-weight: 700; }
+    .day .tag { position: absolute; bottom: 8px; right: 8px; background: var(--accent); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 999px; }
+    .day.selected { border-color: var(--accent); box-shadow: var(--glow); }
+
+    /* Tasks */
+    .task-list { display: flex; flex-direction: column; gap: 10px; }
+    .task-card {
+      background: #0f0e15;
+      border: 1px solid #1f1d24;
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      position: relative;
+    }
+    .task-card.done { border-color: rgba(0, 255, 157, 0.4); }
+    .task-toggle { display: flex; align-items: flex-start; }
+    .toggle-btn {
+      border: 1px solid #272631;
+      background: #15141b;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      min-width: 38px;
+      text-align: center;
+    }
+    .toggle-btn:hover { border-color: var(--accent); box-shadow: var(--glow); }
+    .detail { display: none; margin-top: 6px; color: #b6b3c2; font-size: 12px; line-height: 1.6; }
+    .task-card.open .detail { display: block; }
+    .task-card.archived { opacity: 0.65; border-style: dashed; }
+    .task-card h3 { margin: 0; font-size: 16px; }
+    .task-card .meta { color: var(--muted); font-size: 12px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(229,0,42,0.12); color: #fff; padding: 4px 8px; border-radius: 999px; font-size: 12px; }
+    .task-actions { display: flex; gap: 8px; align-items: center; }
+    .task-actions button { padding: 8px 12px; }
+    .feedback { font-size: 12px; color: #9ef3cf; margin-top: 4px; }
+
+    /* Forms */
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    label { font-size: 13px; color: var(--muted); }
+    input, textarea, select {
+      background: #0f0e15;
+      border: 1px solid #24222c;
+      color: #f7f7f7;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: inherit;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+
+    .primary { background: #b00020; border-color: #000; color: #fff; box-shadow: 3px 3px 0 #000, 5px 5px 0 #b00020; position: relative; overflow: hidden; isolation: isolate; }
+    .primary:hover { filter: brightness(1.05); box-shadow: 3px 3px 0 #ffce00, 5px 5px 0 #000; color: #ffce00; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 10;
+    }
+    .modal { background: #0c0b12; border: 1px solid #24222c; border-radius: 16px; max-width: 520px; width: 100%; padding: 16px; position: relative; max-height: 86vh; overflow-y: auto; }
+    .modal h3 { margin-top: 0; }
+    .close { position: absolute; top: 10px; right: 10px; background: transparent; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+
+    /* Gate overlay */
+    #gateOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+      backdrop-filter: blur(6px);
+    }
+    #gateOverlay.show { display: flex; }
+    #gateCard {
+      background: #0c0b12;
+      border: 1px solid #b00020;
+      border-radius: 14px;
+      padding: 18px;
+      width: min(440px, 96vw);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.55);
+      position: relative;
+    }
+    #gateCard h3 {
+      margin: 0 0 10px;
+      font-family: 'Bangers', 'Bebas Neue', 'Space Grotesk', sans-serif;
+      letter-spacing: 1px;
+      background: #b00020;
+      padding: 6px 10px;
+      display: inline-block;
+      clip-path: var(--poly-a);
+      box-shadow: 4px 4px 0 #000;
+    }
+    #gateStatus { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+
+    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { padding: 6px 10px; border-radius: 999px; border: 1px solid #24222c; cursor: pointer; background: #0f0e15; }
+    .pill.active { border-color: var(--accent); box-shadow: var(--glow); }
+
+    .upload-preview { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+    .upload-preview img { width: 70px; height: 70px; object-fit: cover; border-radius: 10px; border: 1px solid #24222c; }
+
+    .weekday-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .weekday-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid #24222c; background: #0f0e15; cursor: pointer; transition: 0.2s ease; box-shadow: inset 0 0 0 0 rgba(229,0,42,0.35); }
+    .weekday-pill input { accent-color: var(--accent); }
+    .weekday-pill.active { border-color: var(--accent); background: rgba(229,0,42,0.12); box-shadow: var(--glow); }
+
+    /* Sidebar cards */
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+
+    .settings-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .hidden { display: none; }
+    #appShell.hidden { display: none; }
+
+    /* AI loading & FX */
+    #aiLoading {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.72);
+      z-index: 30;
+      backdrop-filter: blur(6px);
+    }
+    #aiLoading.show { display: flex; }
+    .loader {
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      border: 4px solid rgba(255,255,255,0.15);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite, glow 1.6s ease-in-out infinite;
+      box-shadow: 0 0 18px var(--glow-accent);
+    }
+    .loader-label { margin-top: 12px; color: #fff; font-weight: 700; letter-spacing: 0.5px; text-align: center; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes glow { 0%,100% { box-shadow: 0 0 18px var(--glow-accent); } 50% { box-shadow: 0 0 32px var(--glow-accent); } }
+
+    #fxLayer { position: fixed; inset: 0; pointer-events: none; z-index: 25; overflow: hidden; }
+    .gain-burst, .create-burst, .xp-ticker, .level-up {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      padding: 12px 20px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 14px;
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      box-shadow: 0 10px 30px rgba(229,0,42,0.45);
+      animation: burst 1.3s ease-out forwards;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .create-burst { background: linear-gradient(120deg, rgba(0,180,255,0.9), rgba(131,255,215,0.9)); box-shadow: 0 10px 30px rgba(0,180,255,0.4); }
+    .gain-burst { background: linear-gradient(120deg, rgba(229,0,42,0.9), rgba(255,213,79,0.9)); }
+    .xp-ticker { padding: 8px 14px; font-size: 13px; border-radius: 12px; background: rgba(0,0,0,0.75); box-shadow: 0 8px 18px rgba(0,0,0,0.45); animation: drift 1.4s ease-out forwards; }
+    .level-up { background: linear-gradient(120deg, rgba(0,255,157,0.95), rgba(0,180,255,0.9)); box-shadow: 0 12px 28px rgba(0,255,157,0.35); animation: levelpop 1.4s ease-out forwards; }
+    @keyframes burst {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.65); filter: blur(2px); }
+      40% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); filter: blur(0); }
+      100% { opacity: 0; transform: translate(-50%, -60%) scale(1.2); }
+    }
+    @keyframes drift {
+      0% { opacity: 0; transform: translate(-50%, -20%) scale(0.9); }
+      30% { opacity: 1; transform: translate(-50%, -30%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+    }
+    @keyframes levelpop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); filter: blur(2px); }
+      40% { opacity: 1; transform: translate(-50%, -52%) scale(1.08); filter: blur(0); }
+      100% { opacity: 0; transform: translate(-50%, -70%) scale(1.1); }
+    }
+
+    /* Drawer */
+    .drawer {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: min(420px, 94vw);
+      max-height: 82vh;
+      transform: translateY(110%);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      opacity: 0;
+      z-index: 15;
+    }
+    .drawer.open {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .drawer .panel { margin: 0; }
+    .drawer .panel { max-height: 80vh; overflow-y: auto; }
+
+    .drawer-left {
+      left: 14px;
+      right: auto;
+      bottom: auto;
+      top: 70px;
+      width: min(480px, 96vw);
+      transform: translateX(-110%);
+    }
+    .drawer-left.open { transform: translateX(0); opacity: 1; }
+
+    .fab {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #b00020;
+      border: 1px solid #000;
+      color: #fff;
+      font-weight: 800;
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 14px 28px rgba(0,0,0,0.5), 0 10px 22px rgba(176,0,32,0.45);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+      z-index: 14;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .fab:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(0,0,0,0.55), 0 12px 26px rgba(176,0,32,0.55); filter: brightness(1.05); }
+
+    .ghost-btn {
+      position: fixed;
+      top: 16px;
+      padding: 8px 12px;
+      border: 1px solid #000;
+      background: #b00020;
+      color: #fff;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      z-index: 14;
+      transition: border-color 0.2s ease, transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+      clip-path: polygon(8% 6%, 92% 0%, 100% 72%, 10% 100%);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.45), 0 6px 12px rgba(176,0,32,0.4);
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .ghost-btn:hover { border-color: #ffce00; transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0,0,0,0.5), 0 8px 16px rgba(229,0,42,0.5); filter: brightness(1.05); }
+    #calendarToggle { left: 16px; }
+    #settingsToggle { right: 16px; }
+
+    /* Make top toggles share the clean close-button aesthetic */
+    #calendarToggle, #settingsToggle {
+      background: rgba(0,0,0,0.6);
+      border: 1px solid #24222c;
+      color: #fff;
+      border-radius: 12px;
+      clip-path: none;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.45);
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    #calendarToggle::after, #settingsToggle::after { display: none; }
+    #calendarToggle:hover, #settingsToggle:hover { border-color: #ffce00; color: #ffce00; }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      body { padding: 12px; }
+      .calendar-grid { gap: 4px; }
+      .day { min-height: 64px; }
+      .task-card { grid-template-columns: 1fr; }
+      .task-actions { flex-wrap: wrap; }
+      h1 { font-size: 28px; box-shadow: 4px 4px 0 #000; }
+      .panel h2 { font-size: 18px; box-shadow: 3px 3px 0 #000; }
+      .panel { padding: 12px; }
+      .hero { padding: 14px; }
+      .fab { width: 52px; height: 52px; font-size: 20px; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+      .ghost-btn { padding: 6px 10px; font-size: 13px; top: calc(12px + env(safe-area-inset-top, 0px)); }
+      .drawer { right: calc(10px + env(safe-area-inset-right, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); width: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); max-height: 82vh; }
+      .drawer-left { left: calc(10px + env(safe-area-inset-left, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); width: auto; top: calc(64px + env(safe-area-inset-top, 0px)); }
+      .stats-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+      input, textarea, select { font-size: 14px; }
+      .task-card { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="gateOverlay">
+    <div id="gateCard">
+      <h3>输入 ID 进入</h3>
+      <p style="margin:0 0 10px; color: var(--muted);">每位用户需填写唯一 ID。未检测到 ID 时可选择新建。</p>
+      <div class="field">
+        <label style="color:#fff; font-weight:600;">用户 ID</label>
+        <input id="gateInput" placeholder="如: joker" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button id="gateEnter">进入 / 校验</button>
+        <button id="gateCreate" class="primary">新建并进入</button>
+        <button id="gateOffline" class="ghost-btn" style="position:static; clip-path: var(--poly-a);">仅本地使用</button>
+      </div>
+      <div id="gateStatus">请输入 ID 后进入</div>
+    </div>
+  </div>
+  <div id="appShell" class="hidden">
+    <button class="ghost-btn" id="calendarToggle">☰ 日历</button>
+    <button class="ghost-btn" id="settingsToggle">⚙ 设置</button>
+    <button class="fab" id="quickBtn" title="闪投">⚡</button>
+    <header>
+      <div class="hero">
+        <h1>Persona Planner</h1>
+        <p class="subtitle">以待办清单驱动的人生RPG模拟。打卡上传、让 AI 给你评价。</p>
+      </div>
+      <div class="panel">
+        <h2><span class="accent">XP</span> 五维进度</h2>
+        <div class="stats-grid" id="statGrid"></div>
+        <canvas id="radarCanvas"></canvas>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel">
+        <h2><span class="accent">主线</span> 任务</h2>
+        <div class="task-list" id="mainTaskList"></div>
+        <div style="margin-top:10px; color: var(--muted); font-size: 13px;">展示为只读列表，点击任务查看详情。新增请在日历中选择日期创建。</div>
+      </section>
+
+      <section class="panel">
+        <h2><span class="accent">支线</span> 任务</h2>
+        <div class="task-list" id="sideTaskList"></div>
+        <div style="margin-top:10px; color: var(--muted); font-size: 13px;">展示为只读列表，点击任务查看详情。新增请在日历中选择日期创建。</div>
+      </section>
+    </main>
+
+    <template id="taskTemplate">
+      <div class="task-card">
+        <div>
+          <h3></h3>
+          <div class="meta"></div>
+          <div class="chip"></div>
+          <div class="extra"></div>
+          <div class="feedback"></div>
+        </div>
+      </div>
+    </template>
+
+    <div id="modalRoot"></div>
+    <div id="aiLoading"><div style="display:flex; flex-direction:column; align-items:center; gap:10px;"><div class="loader"></div><div class="loader-label">AI 处理中...</div></div></div>
+    <div id="fxLayer"></div>
+
+    <div class="drawer drawer-left" id="calendarDrawer">
+      <div class="panel">
+        <div class="calendar-header">
+          <button id="prevMonth">◀</button>
+          <div id="monthLabel" style="font-weight:700; letter-spacing:1px;"></div>
+          <button id="nextMonth">▶</button>
+          <button class="primary" id="addToday">今日待办</button>
+          <button class="close" id="calendarClose" aria-label="关闭">✕</button>
+        </div>
+        <div class="calendar-grid" id="weekdayRow"></div>
+        <div class="calendar-grid" id="calendar"></div>
+      </div>
+    </div>
+
+    <div class="drawer" id="settingsDrawer">
+      <div class="panel" id="settingsPanel">
+        <h2><span class="accent">设置</span> 面板</h2>
+        <div class="settings-grid">
+          <div class="field" style="border:1px solid #24222c; padding:10px; border-radius:12px;">
+            <label style="color:#fff; font-weight:600;">快捷操作</label>
+            <button id="clearStats" style="margin-top:6px;">清除所有点数（五维 XP）</button>
+            <button id="clearAll" style="margin-top:6px;">清除所有数据（任务 + 设置）</button>
+            <div style="font-size:12px; color: var(--muted); margin-top:6px;">两项操作都会弹出二次确认。</div>
+          </div>
+
+          <div class="field">
+            <label style="color:#fff; font-weight:600;">API 设置</label>
+            <label>API URL</label>
+            <input id="apiUrl" placeholder="https://api.example.com/score" />
+          </div>
+          <div class="field">
+            <label>API Key / Token</label>
+            <input id="apiKey" placeholder="sk-***" />
+          </div>
+          <div class="field">
+            <label>模型 / 备注</label>
+            <input id="modelName" placeholder="gpt-4o 或自定义" />
+          </div>
+
+          <div class="field" style="border:1px solid #24222c; padding:10px; border-radius:12px;">
+            <label style="color:#fff; font-weight:600;">云同步（Firestore + 匿名 Auth）</label>
+            <label>用户名（用来区分不同用户）</label>
+            <input id="username" placeholder="请通过 ID 门填写" readonly />
+            <div style="font-size:12px; color: var(--muted);">ID 只能在门禁处修改，防止误改。留空时使用 Firebase UID。</div>
+            <label style="font-size:14px; color:#fff; display:flex; align-items:center; gap:6px; margin-top:6px;">
+              <input type="checkbox" id="useCloud" /> 启用云同步
+            </label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button id="connectCloud" style="margin-top:6px;">连接 / 手动同步</button>
+              <button id="manualSync" style="margin-top:6px;">保存并上传</button>
+              <button id="logoutBtn" style="margin-top:6px;">退出登录（返回 ID 门）</button>
+            </div>
+            <div id="cloudStatus" style="font-size:12px; color: var(--muted); margin-top:6px;">未连接</div>
+          </div>
+
+          <button class="primary" id="saveSettings">保存设置</button>
+          <div style="font-size:12px; color: var(--muted);">说明：未填写时将使用离线本地评分器模拟加点。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      tasks: [],
+      stats: {
+        knowledge: 0,
+        charm: 0,
+        guts: 0,
+        proficiency: 0,
+        kindness: 0,
+      },
+      settings: {
+        apiUrl: '',
+        apiKey: '',
+        modelName: '',
+        username: '',
+        useCloud: false,
+        authMode: 'anonymous',
+      },
+      selectedDate: new Date(),
+      monthCursor: new Date(),
+      lastUpdated: Date.now(),
+      userId: '',
+    };
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAcUo5m9jJbEV-aka1iwXY2bYFRbduCzg",
+      authDomain: "rpgplanner-31ebe.firebaseapp.com",
+      projectId: "rpgplanner-31ebe",
+      storageBucket: "rpgplanner-31ebe.firebasestorage.app",
+      messagingSenderId: "344346322855",
+      appId: "1:344346322855:web:686a941ff77c74428eb882",
+      measurementId: "G-77Z3BGLNF9"
+    };
+
+    const clientId = `client-${Math.random().toString(36).slice(2, 8)}`;
+
+    const DIMENSIONS = [
+      { key: 'knowledge', label: '学识' },
+      { key: 'charm', label: '魅力' },
+      { key: 'guts', label: '胆识' },
+      { key: 'proficiency', label: '技巧' },
+      { key: 'kindness', label: '仁德' },
+    ];
+
+        const LEVEL_THRESHOLDS = [0, 30, 80, 150, 240, 360];
+        const weekdays = ['日','一','二','三','四','五','六'];
+
+        const els = {
+          statGrid: document.getElementById('statGrid'),
+          radarCanvas: document.getElementById('radarCanvas'),
+          monthLabel: document.getElementById('monthLabel'),
+          calendar: document.getElementById('calendar'),
+          weekdayRow: document.getElementById('weekdayRow'),
+          mainTaskList: document.getElementById('mainTaskList'),
+          sideTaskList: document.getElementById('sideTaskList'),
+          modalRoot: document.getElementById('modalRoot'),
+          addToday: document.getElementById('addToday'),
+          prevMonth: document.getElementById('prevMonth'),
+          nextMonth: document.getElementById('nextMonth'),
+          calendarDrawer: document.getElementById('calendarDrawer'),
+          calendarToggle: document.getElementById('calendarToggle'),
+          calendarClose: document.getElementById('calendarClose'),
+          settingsToggle: document.getElementById('settingsToggle'),
+          settingsPanel: document.getElementById('settingsPanel'),
+          settingsDrawer: document.getElementById('settingsDrawer'),
+          quickBtn: document.getElementById('quickBtn'),
+          apiUrl: document.getElementById('apiUrl'),
+          apiKey: document.getElementById('apiKey'),
+          modelName: document.getElementById('modelName'),
+          username: document.getElementById('username'),
+          logoutBtn: document.getElementById('logoutBtn'),
+          useCloud: document.getElementById('useCloud'),
+          connectCloud: document.getElementById('connectCloud'),
+          manualSync: document.getElementById('manualSync'),
+          cloudStatus: document.getElementById('cloudStatus'),
+          gateOverlay: document.getElementById('gateOverlay'),
+          gateInput: document.getElementById('gateInput'),
+          gateEnter: document.getElementById('gateEnter'),
+          gateCreate: document.getElementById('gateCreate'),
+          gateOffline: document.getElementById('gateOffline'),
+          gateStatus: document.getElementById('gateStatus'),
+          appShell: document.getElementById('appShell'),
+          saveSettings: document.getElementById('saveSettings'),
+          clearStats: document.getElementById('clearStats'),
+          clearAll: document.getElementById('clearAll'),
+          aiLoading: document.getElementById('aiLoading'),
+          fxLayer: document.getElementById('fxLayer'),
+        };
+
+        const setLoading = (show, msg = 'AI 处理中...') => {
+          if (!els.aiLoading) return;
+          els.aiLoading.classList.toggle('show', !!show);
+          const label = els.aiLoading.querySelector('.loader-label');
+          if (label) label.textContent = msg;
+        };
+
+        const debounce = (fn, delay = 1200) => {
+          let t;
+          return (...args) => {
+            clearTimeout(t);
+            t = setTimeout(() => fn(...args), delay);
+          };
+        };
+
+        const spawnFX = (cls, text, opts = {}) => {
+          const layer = els.fxLayer;
+          if (!layer) return;
+          const node = document.createElement('div');
+          node.className = cls;
+          node.textContent = text;
+          const x = opts.x ?? 50;
+          const y = opts.y ?? 50;
+          node.style.left = `${x}%`;
+          node.style.top = `${y}%`;
+          layer.appendChild(node);
+          setTimeout(() => node.remove(), opts.life || 1600);
+        };
+
+        const playGainAnimation = (gains, prevLevels) => {
+          const summary = gains && Object.keys(gains).length
+            ? Object.entries(gains).map(([k,v]) => `${DIMENSIONS.find(d=>d.key===k)?.label||k}+${v}`).join(' / ')
+            : '未加点';
+          spawnFX('gain-burst', summary);
+          playXpTicker(gains);
+          playLevelUp(prevLevels);
+        };
+
+        const playCreateAnimation = () => spawnFX('create-burst', '已创建');
+
+        const playXpTicker = (gains) => {
+          if (!gains) return;
+          Object.entries(gains).forEach(([k, v], idx) => {
+            if (!v) return;
+            const label = DIMENSIONS.find(d => d.key === k)?.label || k;
+            const x = 30 + (idx * 15);
+            const y = 70 - (idx * 10);
+            spawnFX('xp-ticker', `+${v} ${label}`, { x, y, life: 1400 });
+          });
+        };
+
+        const playLevelUp = (prevLevels = {}) => {
+          const curr = currentLevels();
+          DIMENSIONS.forEach(dim => {
+            const before = prevLevels[dim.key] ?? curr[dim.key];
+            const after = curr[dim.key];
+            if (after > before) {
+              spawnFX('level-up', `${dim.label} Lv.${before} → Lv.${after}`, { x: 50, y: 30, life: 1500 });
+            }
+          });
+        };
+
+        function fmtDate(d) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+
+        function parseDate(iso) {
+          const [y, m, d] = iso.split('-').map(Number);
+          return new Date(y, m - 1, d);
+        }
+
+        function levelFor(xp) {
+          let lvl = 0;
+          for (let i = 0; i < LEVEL_THRESHOLDS.length; i++) {
+            if (xp >= LEVEL_THRESHOLDS[i]) lvl = i;
+          }
+          return Math.min(lvl, LEVEL_THRESHOLDS.length - 1);
+        }
+
+        function levelProgress(xp) {
+          const lvl = levelFor(xp);
+          const floor = LEVEL_THRESHOLDS[lvl];
+          const ceil = LEVEL_THRESHOLDS[lvl + 1] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+          if (ceil === floor) return 1;
+          return (xp - floor) / (ceil - floor);
+        }
+
+        function currentLevels() {
+          const res = {};
+          DIMENSIONS.forEach(dim => { res[dim.key] = levelFor(state.stats[dim.key] || 0); });
+          return res;
+        }
+
+        function load() {
+          const saved = localStorage.getItem('persona-planner');
+          if (!saved) return;
+          try {
+            const parsed = JSON.parse(saved);
+            const parsedSelected = parsed.selectedDate ? new Date(parsed.selectedDate) : new Date();
+            const parsedMonth = parsed.monthCursor ? new Date(parsed.monthCursor) : new Date();
+            const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+            const stats = typeof parsed.stats === 'object' && parsed.stats ? parsed.stats : {};
+            Object.assign(state, parsed, {
+              tasks,
+              stats: DIMENSIONS.reduce((acc, dim) => {
+                const val = Number(stats[dim.key] || 0);
+                acc[dim.key] = Number.isFinite(val) ? val : 0;
+                return acc;
+              }, {}),
+              selectedDate: isNaN(parsedSelected) ? new Date() : parsedSelected,
+              monthCursor: isNaN(parsedMonth) ? new Date() : parsedMonth,
+              lastUpdated: Number(parsed.lastUpdated || Date.now()),
+            });
+          } catch (err) {
+            console.error('本地数据损坏，已重置', err);
+            localStorage.removeItem('persona-planner');
+          }
+        }
+        function saveLocal() {
+          const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId };
+          state.lastUpdated = payload.lastUpdated;
+          localStorage.setItem('persona-planner', JSON.stringify(payload));
+        }
+
+        const cloud = { app: null, db: null, auth: null };
+
+        const updateCloudStatus = (msg, isError = false) => {
+          if (els.cloudStatus) {
+            els.cloudStatus.textContent = msg;
+            els.cloudStatus.style.color = isError ? '#ff8a8a' : 'var(--muted)';
+          }
+          if (els.gateStatus && els.gateOverlay?.classList.contains('show')) {
+            els.gateStatus.textContent = msg;
+            els.gateStatus.style.color = isError ? '#ff8a8a' : 'var(--muted)';
+          }
+        };
+
+        const ensureFirebase = async () => {
+          if (cloud.app) return cloud;
+          if (!window.firebase) throw new Error('Firebase SDK 未加载');
+          cloud.app = firebase.initializeApp(firebaseConfig);
+          cloud.auth = firebase.auth();
+          cloud.db = firebase.firestore();
+          try { await cloud.db.enablePersistence(); } catch (err) { console.warn('持久化未开启', err?.message); }
+          return cloud;
+        };
+
+        const ensureAuth = async () => {
+          const { auth } = await ensureFirebase();
+          if (auth.currentUser) return auth.currentUser;
+          const cred = await auth.signInAnonymously();
+          state.userId = cred.user?.uid || '';
+          return cred.user;
+        };
+
+        const docIdForUser = (user) => {
+          const name = (state.settings.username || '').trim();
+          return name || user?.uid || '';
+        };
+
+        const saveRemote = async () => {
+          if (!state.settings.useCloud) return;
+          try {
+            const user = await ensureAuth();
+            const id = docIdForUser(user);
+            if (!id) {
+              updateCloudStatus('请先填写用户名或等待登录');
+              return;
+            }
+            const { db } = await ensureFirebase();
+            const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId };
+            await db.collection('users').doc(id).set(payload, { merge: true });
+            state.lastUpdated = payload.lastUpdated;
+            updateCloudStatus('已同步至云端');
+          } catch (err) {
+            console.error('保存到云端失败', err);
+            updateCloudStatus(`云同步失败: ${err.message}`, true);
+          }
+        };
+
+        const saveRemoteDebounced = debounce(saveRemote, 1200);
+
+        const mergeRemote = (remote) => {
+          if (!remote) return;
+          const remoteTime = Number(remote.lastUpdated || 0);
+          const localTime = Number(state.lastUpdated || 0);
+          if (remoteTime && remoteTime < localTime) return; // 保留较新的本地
+          state.tasks = Array.isArray(remote.tasks) ? remote.tasks : state.tasks;
+          state.stats = { ...state.stats, ...(remote.stats || {}) };
+          state.settings = { ...state.settings, ...(remote.settings || {}) };
+          state.selectedDate = remote.selectedDate ? parseDate(remote.selectedDate) : state.selectedDate;
+          state.monthCursor = remote.monthCursor ? parseDate(remote.monthCursor) : state.monthCursor;
+          state.lastUpdated = remoteTime || state.lastUpdated;
+        };
+
+        const loadRemote = async () => {
+          if (!state.settings.useCloud) return;
+          try {
+            const user = await ensureAuth();
+            const id = docIdForUser(user);
+            if (!id) {
+              updateCloudStatus('请先填写用户名再同步');
+              return;
+            }
+            const { db } = await ensureFirebase();
+            const snap = await db.collection('users').doc(id).get();
+            if (snap.exists) {
+              mergeRemote(snap.data());
+              updateCloudStatus('已从云端加载');
+              if (!state.settings.apiUrl || !state.settings.apiKey) {
+                updateCloudStatus('该 ID 未设置 API，请在设置中填写 API URL/Key 后使用打分', true);
+              }
+            } else {
+              updateCloudStatus('云端无数据，已初始化本地为云数据');
+              await saveRemote();
+            }
+            renderStats();
+            renderCalendar();
+            renderTasks();
+            saveLocal();
+            if (els.appShell) els.appShell.classList.remove('hidden');
+          } catch (err) {
+            console.error('云端加载失败', err);
+            updateCloudStatus(`云端加载失败: ${err.message}`, true);
+          }
+        };
+
+        const showGate = (show) => {
+          if (!els.gateOverlay) return;
+          els.gateOverlay.classList.toggle('show', !!show);
+          if (show) {
+            if (els.appShell) els.appShell.classList.add('hidden');
+          }
+        };
+
+        const proceedAfterGate = async () => {
+          showGate(false);
+          if (els.appShell) els.appShell.classList.remove('hidden');
+          renderWeekdays();
+          renderStats();
+          renderCalendar();
+          renderTasks();
+          save();
+        };
+
+        const handleGate = async (mode = 'check') => {
+          const id = (els.gateInput?.value || '').trim();
+          if (!id) {
+            updateCloudStatus('请先输入 ID', true);
+            return;
+          }
+          state.settings.username = id;
+          state.settings.useCloud = true;
+          els.username.value = id;
+          els.useCloud.checked = true;
+          saveLocal();
+          updateCloudStatus('检测 ID...');
+          try {
+            const user = await ensureAuth();
+            const { db } = await ensureFirebase();
+            const docRef = db.collection('users').doc(id);
+            const snap = await docRef.get();
+            const exists = snap.exists;
+            if (!exists && mode === 'check') {
+              const shouldCreate = confirm('未检测到该 ID，是否创建新的 ID？');
+              if (!shouldCreate) { updateCloudStatus('已取消，请输入其他 ID'); return; }
+            }
+            if (!exists) {
+              await docRef.set({ ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId });
+              updateCloudStatus('已创建新 ID 并同步');
+            } else {
+              mergeRemote(snap.data());
+              updateCloudStatus('已加载云端数据');
+            }
+            renderStats();
+            renderCalendar();
+            renderTasks();
+            saveLocal();
+            showGate(false);
+            if (els.appShell) els.appShell.classList.remove('hidden');
+          } catch (err) {
+            console.error('Gate 处理失败', err);
+            updateCloudStatus(`处理失败: ${err.message}`, true);
+          }
+        };
+
+        function save() {
+          saveLocal();
+          if (state.settings.useCloud) saveRemoteDebounced();
+        }
+
+        function applyGains(gains, sign = 1) {
+          DIMENSIONS.forEach(dim => {
+            const delta = (gains?.[dim.key] || 0) * sign;
+            const next = (state.stats[dim.key] || 0) + delta;
+            const maxXp = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+            state.stats[dim.key] = Math.min(maxXp, Math.max(0, next));
+          });
+        }
+
+        function renderStats() {
+          els.statGrid.innerHTML = '';
+          DIMENSIONS.forEach(dim => {
+            const xp = state.stats[dim.key] || 0;
+            const lvl = levelFor(xp);
+            const pct = levelProgress(xp) * 100;
+            const div = document.createElement('div');
+            div.className = 'stat';
+            div.innerHTML = `
+              <div class="label"><span>${dim.label}</span><span>Lv.${lvl} / 5</span></div>
+              <div class="bar"><span style="width:${pct}%;"></span></div>
+            `;
+            els.statGrid.appendChild(div);
+          });
+          renderRadar();
+        }
+
+        function renderRadar() {
+          const canvas = els.radarCanvas;
+          const ctx = canvas.getContext('2d');
+          const dpr = window.devicePixelRatio || 1;
+          const width = canvas.clientWidth;
+          const height = canvas.clientHeight;
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, width, height);
+
+          const cx = width / 2;
+          const cy = height / 2 + 10;
+          const radius = Math.min(width, height) * 0.32;
+          const tilt = { rot: -0.22, sx: 1.08, sy: 0.8 };
+          const maxVal = 5;
+
+          const transformPoint = (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const rdx = dx * Math.cos(tilt.rot) - dy * Math.sin(tilt.rot);
+            const rdy = dx * Math.sin(tilt.rot) + dy * Math.cos(tilt.rot);
+            return [cx + rdx * tilt.sx, cy + rdy * tilt.sy];
+          };
+
+          const starPoints = (factor, rotate = -Math.PI / 2) => {
+            const outer = radius * factor;
+            const inner = outer * 0.48;
+            const pts = [];
+            for (let i = 0; i < 5; i++) {
+              const a = rotate + (Math.PI * 2 * i) / 5;
+              const xOuter = cx + outer * Math.cos(a);
+              const yOuter = cy + outer * Math.sin(a);
+              pts.push(transformPoint(xOuter, yOuter));
+              const aInner = a + Math.PI / 5;
+              const xInner = cx + inner * Math.cos(aInner);
+              const yInner = cy + inner * Math.sin(aInner);
+              pts.push(transformPoint(xInner, yInner));
+            }
+            return pts;
+          };
+
+          // grid rings
+          ctx.lineWidth = 1;
+          for (let i = 1; i <= maxVal; i++) {
+            const pts = starPoints(i / maxVal);
+            ctx.beginPath();
+            pts.forEach(([x, y], idx) => idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+            ctx.closePath();
+            ctx.strokeStyle = i === maxVal ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)';
+            ctx.stroke();
+          }
+
+          // player star
+          const pts = DIMENSIONS.map((dim, idx) => {
+            const val = levelFor(Math.max(0, state.stats[dim.key] || 0));
+            const factor = val / maxVal;
+            const baseAngle = -Math.PI / 2 + (Math.PI * 2 * idx) / DIMENSIONS.length;
+            const r = radius * factor;
+            return transformPoint(cx + r * Math.cos(baseAngle), cy + r * Math.sin(baseAngle));
+          });
+
+          ctx.beginPath();
+          pts.forEach(([x, y], idx) => idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+          ctx.closePath();
+          const grd = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
+          grd.addColorStop(0, 'rgba(255,206,0,0.75)');
+          grd.addColorStop(1, 'rgba(255,255,255,0.3)');
+          ctx.fillStyle = grd;
+          ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
+          pts.forEach(([x, y]) => {
+            ctx.beginPath();
+            ctx.fillStyle = '#000';
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.fillStyle = '#ffce00';
+            ctx.arc(x, y, 2.3, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '12px "Space Grotesk", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          DIMENSIONS.forEach((dim, idx) => {
+            const angle = (Math.PI * 2 * idx / DIMENSIONS.length) - Math.PI / 2;
+            const x = cx + (radius + 24) * Math.cos(angle);
+            const y = cy + (radius + 24) * Math.sin(angle);
+            const [tx, ty] = transformPoint(x, y);
+            ctx.save();
+            ctx.translate(tx, ty);
+            ctx.rotate(-0.22);
+            ctx.font = 'bold 14px "Bangers", "Space Grotesk", sans-serif';
+            ctx.fillStyle = '#000';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#fff';
+            ctx.strokeText(dim.label, 0, 0);
+            ctx.fillText(dim.label, 0, 0);
+            ctx.restore();
+          });
+        }
+
+        function taskDateLabel(task) {
+          const todayDate = new Date();
+          const today = fmtDate(todayDate);
+          if (task.date === today) return '今天';
+          const diff = (parseDate(task.date) - todayDate) / (1000 * 60 * 60 * 24);
+          if (diff >= 0.5 && diff < 1.5) return '明天';
+          if (diff >= 1.5 && diff < 2.5) return '后天';
+          return task.date;
+        }
+
+        const typeFromImportance = (imp) => (imp === '低' ? 'side' : 'main');
+
+        function renderTasks() {
+          const current = fmtDate(state.selectedDate);
+          const importanceOrder = { '高': 0, '中': 1, '低': 2 };
+          const list = state.tasks
+            .filter(t => t.date === current)
+            .sort((a, b) => {
+              const ia = importanceOrder[a.importance] ?? 1;
+              const ib = importanceOrder[b.importance] ?? 1;
+              if (ia !== ib) return ia - ib;
+              if (a.date !== b.date) return a.date.localeCompare(b.date);
+              const ta = a.time || '';
+              const tb = b.time || '';
+              if (ta !== tb) return ta.localeCompare(tb);
+              return (a.created || 0) - (b.created || 0);
+            });
+          const main = list.filter(t => t.type !== 'side');
+          const side = list.filter(t => t.type === 'side');
+
+          const renderList = (arr, container) => {
+            container.innerHTML = '';
+            if (!arr.length) {
+              const empty = document.createElement('div');
+              empty.style.color = 'var(--muted)';
+              empty.textContent = '暂无任务，点击日历创建。';
+              container.appendChild(empty);
+              return;
+            }
+
+            const pending = arr.filter(t => t.status !== 'done');
+            const done = arr.filter(t => t.status === 'done');
+
+            const renderTask = (task, isArchived = false) => {
+              const tpl = document.getElementById('taskTemplate');
+              const node = tpl.content.firstElementChild.cloneNode(true);
+              const body = node.querySelector('div');
+              node.querySelector('h3').textContent = task.title;
+              const metaParts = [taskDateLabel(task)];
+              if (task.time) metaParts.push(task.time);
+              if (task.location) metaParts.push(task.location);
+              if (task.groupId) {
+                const group = state.tasks.filter(t => t.groupId === task.groupId);
+                const doneCount = group.filter(t => t.status === 'done').length;
+                metaParts.push(`${doneCount}/${group.length}`);
+              }
+              node.querySelector('.meta').textContent = metaParts.join(' · ');
+              const typeLabel = task.type === 'side' ? '支线' : '主线';
+              const dimLabel = DIMENSIONS.find(d => d.key === task.dimension)?.label || '自由';
+              const importance = task.importance || '普通';
+              node.querySelector('.chip').textContent = `${typeLabel} · ${dimLabel} · ${importance}`;
+
+              const detail = document.createElement('div');
+              detail.className = 'detail';
+              const statusLabel = task.status === 'done' ? '已完成' : '待做';
+              detail.innerHTML = `
+                <div>状态：${statusLabel}${task.groupId ? ` · 进度 ${metaParts.find(p => p.includes('/')) || ''}` : ''}</div>
+                <div>描述：${task.description || '无'}</div>
+                <div>地点/参与人：${task.location || '未设'} / ${task.people || '—'}</div>
+                <div>方法：${task.method || '—'}</div>
+                <div>反馈：${task.feedback || '暂无'}</div>
+              `;
+              body.appendChild(detail);
+
+              const toggleWrap = document.createElement('div');
+              toggleWrap.className = 'task-toggle';
+              const toggleBtn = document.createElement('button');
+              toggleBtn.className = 'toggle-btn';
+              toggleBtn.textContent = '+';
+              toggleBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isOpen = node.classList.toggle('open');
+                toggleBtn.textContent = isOpen ? '-' : '+';
+              };
+              toggleWrap.appendChild(toggleBtn);
+              node.appendChild(toggleWrap);
+
+              if (task.status === 'done') node.classList.add('done');
+              if (isArchived) node.classList.add('archived');
+              node.style.cursor = 'pointer';
+              node.onclick = () => openDetailModal(task.id);
+              container.appendChild(node);
+            };
+
+            pending.forEach(task => renderTask(task, false));
+            if (done.length) {
+              const cap = document.createElement('div');
+              cap.style.color = 'var(--muted)';
+              cap.style.fontSize = '12px';
+              cap.style.marginTop = '6px';
+              cap.textContent = '已完成';
+              container.appendChild(cap);
+              done.forEach(task => renderTask(task, true));
+            }
+          };
+
+          renderList(main, els.mainTaskList);
+          renderList(side, els.sideTaskList);
+        }
+
+        function renderWeekdays() {
+          els.weekdayRow.innerHTML = '';
+          weekdays.forEach(w => {
+            const el = document.createElement('div');
+            el.className = 'weekday';
+            el.textContent = w;
+            els.weekdayRow.appendChild(el);
+          });
+        }
+
+        function renderCalendar() {
+          const cursor = state.monthCursor;
+          const year = cursor.getFullYear();
+          const month = cursor.getMonth();
+          els.monthLabel.textContent = `${year} 年 ${month + 1} 月`;
+
+          const firstDay = new Date(year, month, 1);
+          const offset = firstDay.getDay();
+          const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+          els.calendar.innerHTML = '';
+          for (let i = 0; i < offset; i++) {
+            const empty = document.createElement('div');
+            els.calendar.appendChild(empty);
+          }
+
+          for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const iso = fmtDate(date);
+            const dayEl = document.createElement('div');
+            dayEl.className = 'day';
+            if (fmtDate(state.selectedDate) === iso) dayEl.classList.add('selected');
+            const hasTasks = state.tasks.filter(t => t.date === iso).length;
+            dayEl.innerHTML = `<div class="num">${day}</div>${hasTasks ? `<div class="tag">${hasTasks}</div>` : ''}`;
+            dayEl.onclick = () => {
+              state.selectedDate = date;
+              save();
+              renderCalendar();
+              renderTasks();
+              openDayModal(iso);
+            };
+            els.calendar.appendChild(dayEl);
+          }
+        }
+
+        function openDayModal(dateIso) {
+          const modal = document.createElement('div');
+          modal.className = 'modal-backdrop';
+          const tasks = state.tasks
+            .filter(t => t.date === dateIso)
+            .sort((a, b) => {
+              const importanceOrder = { '高': 0, '中': 1, '低': 2 };
+              const ia = importanceOrder[a.importance] ?? 1;
+              const ib = importanceOrder[b.importance] ?? 1;
+              if (ia !== ib) return ia - ib;
+              const ta = a.time || '';
+              const tb = b.time || '';
+              if (ta !== tb) return ta.localeCompare(tb);
+              return (a.created || 0) - (b.created || 0);
+            });
+
+          modal.innerHTML = `
+            <div class="modal">
+              <button class="close" aria-label="关闭">✕</button>
+              <h3>${dateIso} 的任务</h3>
+              <div id="dayList" class="task-list" style="margin-top:10px;"></div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <button class="primary" id="dayCreate">在此日创建</button>
+                <button id="dayClose">关闭</button>
+              </div>
+            </div>
+          `;
+
+          const close = () => modal.remove();
+          modal.querySelector('.close').onclick = close;
+          modal.querySelector('#dayClose').onclick = close;
+          modal.onclick = e => { if (e.target === modal) close(); };
+          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+
+          const listEl = modal.querySelector('#dayList');
+          if (!tasks.length) {
+            const empty = document.createElement('div');
+            empty.style.color = 'var(--muted)';
+            empty.textContent = '这一天还没有任务，点击下方创建。';
+            listEl.appendChild(empty);
+          } else {
+            tasks.forEach(task => {
+              const card = document.createElement('div');
+              card.className = 'task-card';
+              if (task.status === 'done') card.classList.add('done');
+              const dimLabel = DIMENSIONS.find(d => d.key === task.dimension)?.label || '自由';
+              const typeLabel = task.type === 'side' ? '支线' : '主线';
+              const statusLabel = task.status === 'done' ? '已完成' : '待做';
+              card.innerHTML = `
+                <div>
+                  <h3>${task.title}</h3>
+                  <div class="meta">${task.time || '未设时间'} · ${task.location || '未设地点'} · ${statusLabel}</div>
+                  <div class="chip">${typeLabel} · ${dimLabel} · ${task.importance || '普通'}</div>
+                  <div class="extra">${task.description || ''}</div>
+                </div>
+              `;
+              card.style.cursor = 'pointer';
+              card.onclick = () => { close(); openDetailModal(task.id); };
+              listEl.appendChild(card);
+            });
+          }
+
+          modal.querySelector('#dayCreate').onclick = () => { close(); openTaskModal(undefined, { presetDate: dateIso }); };
+          els.modalRoot.appendChild(modal);
+        }
+
+        function openDetailModal(taskId) {
+          const task = state.tasks.find(t => t.id === taskId);
+          if (!task) return;
+          const modal = document.createElement('div');
+          modal.className = 'modal-backdrop';
+          const dimLabel = DIMENSIONS.find(d => d.key === task.dimension)?.label || '自由';
+          const typeLabel = task.type === 'side' ? '支线' : '主线';
+          modal.innerHTML = `
+            <div class="modal">
+              <button class="close" aria-label="关闭">✕</button>
+              <h3>${task.title}</h3>
+              <div class="field"><label>日期</label><div>${taskDateLabel(task)}</div></div>
+              <div class="field"><label>时间</label><div>${task.time || '未设定'}</div></div>
+              <div class="field"><label>地点</label><div>${task.location || '未设定'}</div></div>
+              <div class="field"><label>重要程度</label><div>${task.importance || '普通'}</div></div>
+              <div class="field"><label>类型</label><div>${typeLabel} · ${dimLabel}</div></div>
+              <div class="field"><label>重复</label><div>${task.repeat || '无'}</div></div>
+              <div class="field"><label>参与人 / 方法</label><div>${task.people || '—'} / ${task.method || '—'}</div></div>
+              <div class="field"><label>描述</label><div>${task.description || '无描述'}</div></div>
+              <div class="field"><label>反馈 / 评分</label><div>${task.feedback || '暂无'}</div></div>
+              <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="primary" id="dEdit">编辑</button>
+                <button class="primary" id="dComplete">完成并加点</button>
+                <button id="dDelete">删除</button>
+              </div>
+            </div>
+          `;
+          const close = () => modal.remove();
+          modal.querySelector('.close').onclick = close;
+          modal.onclick = e => { if (e.target === modal) close(); };
+          modal.querySelector('#dEdit').onclick = () => { close(); openTaskModal(task, { presetDate: task.date }); };
+          modal.querySelector('#dComplete').onclick = () => { close(); openCompleteModal(task.id); };
+          modal.querySelector('#dDelete').onclick = () => {
+            if (task.gains) applyGains(task.gains, -1);
+            state.tasks = state.tasks.filter(t => t.id !== task.id);
+            save();
+            renderCalendar();
+            renderTasks();
+            renderStats();
+            close();
+          };
+          els.modalRoot.appendChild(modal);
+        }
+
+        function openCompleteModal(taskId) {
+          const task = state.tasks.find(t => t.id === taskId);
+          if (!task) return;
+          const modal = document.createElement('div');
+          modal.className = 'modal-backdrop';
+          modal.innerHTML = `
+            <div class="modal">
+              <button class="close" aria-label="关闭">✕</button>
+              <h3>完成并加点</h3>
+              <div class="field">
+                <label>补充描述 / 证据</label>
+                <textarea id="cEvidence" placeholder="描述完成情况...">${task.evidenceText || ''}</textarea>
+              </div>
+              <div class="field">
+                <label>上传图片（可选）</label>
+                <input type="file" id="cImg" accept="image/*" />
+              </div>
+              <div class="upload-preview" id="cPreview" style="display:${task.evidenceImage ? 'grid' : 'none'};">
+                ${task.evidenceImage ? `<img src="${task.evidenceImage}" alt="evidence"><div>已选择图片</div>` : ''}
+              </div>
+              <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="primary" id="cSubmit">提交并加点</button>
+                <button id="cCancel">取消</button>
+              </div>
+            </div>
+          `;
+
+          const close = () => modal.remove();
+          modal.querySelector('.close').onclick = close;
+          modal.onclick = e => { if (e.target === modal) close(); };
+          modal.querySelector('#cCancel').onclick = close;
+          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+
+          let imgData = task.evidenceImage || '';
+          const preview = modal.querySelector('#cPreview');
+          const imgInput = modal.querySelector('#cImg');
+          if (imgInput) {
+            imgInput.onchange = e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                imgData = reader.result;
+                preview.style.display = 'grid';
+                preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>${file.name}</div>`;
+              };
+              reader.readAsDataURL(file);
+            };
+          }
+
+          modal.querySelector('#cSubmit').onclick = async () => {
+            const evidenceText = modal.querySelector('#cEvidence').value.trim();
+            const idx = state.tasks.findIndex(t => t.id === taskId);
+            if (idx === -1) { close(); return; }
+            state.tasks[idx] = {
+              ...state.tasks[idx],
+              status: 'done',
+              evidenceText,
+              evidenceImage: imgData,
+            };
+            save();
+            close();
+            await evaluateTask(taskId);
+            renderCalendar();
+            renderTasks();
+          };
+
+          els.modalRoot.appendChild(modal);
+        }
+
+        async function aiSuggestTask(text, imgData) {
+          setLoading(true, 'AI 规划中...');
+          const todayIso = fmtDate(new Date());
+          const { apiUrl, apiKey, modelName } = state.settings;
+
+          const defaultPlannedGains = () => ({ knowledge: 1, proficiency: 1 });
+
+          const normalizePlannedGains = (raw) => {
+            const mapping = {
+              knowledge: 'knowledge', '学识': 'knowledge', '学习': 'knowledge', '知识': 'knowledge',
+              charm: 'charm', '魅力': 'charm', '社交': 'charm', '表达': 'charm',
+              guts: 'guts', '胆识': 'guts', '勇气': 'guts', '坚韧': 'guts',
+              proficiency: 'proficiency', '技巧': 'proficiency', '技术': 'proficiency', '手艺': 'proficiency',
+              kindness: 'kindness', '仁德': 'kindness', '善良': 'kindness', '同理心': 'kindness',
+            };
+            const gains = {};
+            Object.entries(raw || {}).forEach(([k, v]) => {
+              const key = mapping[k] || mapping[k?.toLowerCase?.()] || mapping[k?.trim?.()];
+              const num = Number(v);
+              if (!key || Number.isNaN(num)) return;
+              gains[key] = Math.max(0, Math.min(3, num));
+            });
+            return gains;
+          };
+
+          const parseJsonLoose = (raw) => {
+            if (typeof raw !== 'string') return raw || {};
+            // strip code fences / backticks
+            const cleaned = raw.replace(/```[a-zA-Z]*\s*([\s\S]*?)```/g, '$1').replace(/^[`\s]+|[`\s]+$/g, '').trim();
+            const candidates = [cleaned];
+            const braceMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (braceMatch) candidates.unshift(braceMatch[0]);
+            for (const c of candidates) {
+              try { return JSON.parse(c); } catch (err) { /* try next */ }
+            }
+            return null;
+          };
+
+          const parseLocalDates = (raw) => {
+            const dates = [];
+            const today = new Date();
+            const pushDate = (d) => dates.push(fmtDate(d));
+            const nextWeekStart = (() => {
+              const day = today.getDay();
+              const diffToMon = (8 - day) % 7 || 7; // next Monday
+              const d = new Date(today);
+              d.setDate(today.getDate() + diffToMon);
+              return d;
+            })();
+
+            if (/明天/.test(raw)) {
+              const d = new Date(today);
+              d.setDate(today.getDate() + 1);
+              pushDate(d);
+            }
+
+            if (/后天/.test(raw)) {
+              const d = new Date(today);
+              d.setDate(today.getDate() + 2);
+              pushDate(d);
+            }
+
+            if (/下一?周每天/.test(raw)) {
+              for (let i = 0; i < 7; i++) {
+                const d = new Date(nextWeekStart);
+                d.setDate(nextWeekStart.getDate() + i);
+                pushDate(d);
+              }
+            }
+
+            if (/工作日/.test(raw)) {
+              for (let i = 0; i < 5; i++) {
+                const d = new Date(nextWeekStart);
+                d.setDate(nextWeekStart.getDate() + i);
+                pushDate(d);
+              }
+            }
+
+            if (/每周.*(四|周四|星期四)/.test(raw)) {
+              const first = new Date(today);
+              const day = first.getDay();
+              const diff = (4 - day + 7) % 7 || 7; // next Thursday (4)
+              first.setDate(first.getDate() + diff);
+              for (let i = 0; i < 4; i++) {
+                const d = new Date(first);
+                d.setDate(first.getDate() + i * 7);
+                pushDate(d);
+              }
+            }
+
+            if (/下个月.*(1日|一日|1号|一号)/.test(raw)) {
+              const d = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+              pushDate(d);
+            }
+
+            if (/下个月/.test(raw) && !dates.length) {
+              const d = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+              pushDate(d);
+            }
+
+            return dates;
+          };
+
+            const ensureDates = (input, rawText) => {
+              const arr = Array.isArray(input) ? input : (input ? [input] : []);
+              const localDates = parseLocalDates(rawText || '');
+              const picked = localDates.length ? localDates : arr;
+              if (!picked.length) return [fmtDate(new Date())];
+              const uniq = Array.from(new Set(picked)).sort();
+              return uniq;
+            };
+
+            const buildMultiDates = (mode, weekday = 4) => {
+              const dates = [];
+              const today = new Date();
+              const fmt = d => fmtDate(d);
+              const nextWeekStart = (() => {
+                const day = today.getDay();
+                const diffToMon = (8 - day) % 7 || 7;
+                const d = new Date(today);
+                d.setDate(today.getDate() + diffToMon);
+                return d;
+              })();
+
+              if (mode === 'next-week-daily') {
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date(nextWeekStart);
+                  d.setDate(nextWeekStart.getDate() + i);
+                  dates.push(fmt(d));
+                }
+              } else if (mode === 'next-week-workdays') {
+                for (let i = 0; i < 5; i++) {
+                  const d = new Date(nextWeekStart);
+                  d.setDate(nextWeekStart.getDate() + i);
+                  dates.push(fmt(d));
+                }
+              } else if (mode === 'weekday-4') {
+                const first = new Date(today);
+                const diff = (weekday - first.getDay() + 7) % 7 || 7;
+                first.setDate(first.getDate() + diff);
+                for (let i = 0; i < 4; i++) {
+                  const d = new Date(first);
+                  d.setDate(first.getDate() + i * 7);
+                  dates.push(fmt(d));
+                }
+              }
+              return dates;
+            };
+
+          const fallback = (reason = '使用本地建议') => {
+            const dates = ensureDates([], text);
+            return {
+              title: text.slice(0, 30) || 'AI 制定任务',
+              dates,
+              date: dates[0],
+              time: '09:00-10:00',
+              location: '未设定',
+              importance: '中',
+              repeat: '无',
+              description: text,
+              method: '简单执行即可',
+              people: '本人',
+              plannedGains: defaultPlannedGains(),
+              reason,
+            };
+          };
+
+          if (!text) { setLoading(false); return fallback('缺少描述'); }
+          const url = (apiUrl || '').trim();
+          const looksDeepseek = url.includes('deepseek.com');
+          const looksGemini = url.includes('generativelanguage.googleapis.com') || url.includes('googleapis.com');
+          const authHeader = apiKey ? (apiKey.toLowerCase().startsWith('bearer ') ? apiKey : `Bearer ${apiKey}`) : '';
+          const endpoint = (() => {
+            if (looksDeepseek && !/\/v\d+\//.test(url)) return `${url.replace(/\/$/, '')}/v1/chat/completions`;
+            if (looksGemini) {
+              if (!url.includes('?key=')) {
+                const joiner = url.includes('?') ? '&' : '?';
+                return `${url}${joiner}key=${encodeURIComponent(apiKey || '')}`;
+              }
+            }
+            return url;
+          })();
+
+          if (!url || !apiKey) { setLoading(false); return fallback('未配置 API'); }
+
+          try {
+            const systemPrompt = '你是任务规划助手，请只返回 JSON。格式：{"title":string,"dates":string|string[],"time":string,"location":string,"importance":"高|中|低","type":"main|side","repeat":string,"description":string,"method":string,"people":string,"plannedGains":object}。plannedGains 必须使用英文 key 且来自 [knowledge, charm, guts, proficiency, kindness]，每个值为 0-3 的整数，至少给出一项（无则用 {"knowledge":1,"proficiency":1}）。不要输出多余文字。支持多日计划。';
+            const userContent = `今天日期：${todayIso}（以此为“今天”基准，不使用用户预览的日期）。\n原始描述：${text}\n请给出日期（或多日期列表）、是否重复、具体时间段、地点、重要程度、主线或支线、额外描述、执行方法、涉及人员，并返回 plannedGains（英文 key: knowledge/charm/guts/proficiency/kindness，0-3 的整数，至少一个）。`;
+            const body = looksDeepseek ? {
+              model: modelName || 'deepseek-chat',
+              stream: false,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userContent },
+              ],
+            } : looksGemini ? {
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    { text: `${systemPrompt}\n${userContent}` },
+                  ],
+                },
+              ],
+              generationConfig: { temperature: 0.2 },
+            } : {
+              description: text,
+              image: imgData,
+              ask: 'plan-task',
+            };
+
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(!looksGemini && authHeader ? { 'Authorization': authHeader } : {}),
+                ...(modelName && !looksDeepseek && !looksGemini ? { 'X-Model': modelName } : {}),
+              },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json().catch(() => ({}));
+            const raw = looksDeepseek ? data.choices?.[0]?.message?.content?.trim?.() : looksGemini ? data.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.() : data?.suggestion;
+            const parsed = parseJsonLoose(raw);
+            if (!parsed) {
+              console.error('AI 规划解析失败', raw);
+              alert('AI 规划返回非 JSON，请检查提示词或模型输出');
+              return fallback('AI 规划解析失败');
+            }
+            const dates = ensureDates(Array.isArray(parsed.dates) ? parsed.dates : (parsed.date || parsed.dates), text);
+            const plannedGainsRaw = parsed.plannedGains || parsed.gains;
+            const plannedGainsNormalized = normalizePlannedGains(plannedGainsRaw);
+            const plannedGains = Object.keys(plannedGainsNormalized).length ? plannedGainsNormalized : defaultPlannedGains();
+            const result = {
+              title: parsed.title || text.slice(0, 30) || 'AI 制定任务',
+              dates,
+              date: dates[0],
+              time: parsed.time || '09:00-10:00',
+              location: parsed.location || '未设定',
+              importance: parsed.importance || '中',
+              repeat: parsed.repeat || '无',
+              description: parsed.description || text,
+              method: parsed.method || '按计划执行',
+              people: parsed.people || '本人',
+              dimension: parsed.dimension,
+              plannedGains,
+            };
+            return result;
+          } catch (err) {
+            console.error('AI 规划失败', err);
+            alert('AI 规划失败：请检查 API URL/Key 或稍后重试');
+            return fallback('AI 规划失败');
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        function openTaskModal(existing, opts = {}) {
+          const { presetDate, markDone, suggestion } = opts;
+          const isEdit = Boolean(existing);
+          const modal = document.createElement('div');
+          modal.className = 'modal-backdrop';
+          const dateValue = existing?.date || presetDate || fmtDate(state.selectedDate);
+          const startInForm = isEdit || markDone || Boolean(suggestion);
+
+          modal.innerHTML = `
+            <div class="modal">
+              <button class="close" aria-label="关闭">✕</button>
+              <button id="mToggle" style="position:absolute; top:10px; right:44px; border:1px solid #24222c; background:#15141b; color:#fff; border-radius:10px; padding:6px 10px; cursor:pointer;">${startInForm ? 'AI 模式' : '表单模式'}</button>
+              <h3>${isEdit ? '编辑任务' : '创建任务'}</h3>
+
+              <div id="aiView" class="field" style="${startInForm ? 'display:none;' : ''}">
+                <label>让 AI 制定（默认）</label>
+                <textarea id="mAiPlan" placeholder="描述需求，例如：下一周每天晨跑30分钟；工作日写日报；后天拜访客户"></textarea>
+                <div class="field" style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+                  <input type="file" id="mAiImg" accept="image/*" />
+                  <button id="mAiBtn">AI 制定</button>
+                  <span id="mAiStatus" style="font-size:12px; color: var(--muted);"></span>
+                </div>
+                <div style="font-size:12px; color: var(--muted);">示例：后天买礼物；下一周每天健身；工作日 9:00-18:00 写周报；每周的星期四外出谈判；下个月一日体检。</div>
+              </div>
+
+              <div id="formView" style="${startInForm ? '' : 'display:none;'}">
+                <div class="field">
+                  <label>标题</label>
+                  <input id="mTitle" placeholder="例：30 分钟阅读" />
+                </div>
+                <div class="field" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:8px;">
+                  <div class="field">
+                    <label>日期</label>
+                    <input id="mDate" type="date" />
+                  </div>
+                  <div class="field">
+                    <label>时间段</label>
+                    <input id="mTime" placeholder="09:00-10:00" />
+                  </div>
+                  <div class="field">
+                    <label>地点</label>
+                    <input id="mLocation" placeholder="线上 / 线下" />
+                  </div>
+                </div>
+                <div class="field" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:8px;">
+                  <div class="field">
+                    <label>重要程度（高/中=主线，低=支线）</label>
+                    <select id="mImportance">
+                      <option value="高">高</option>
+                      <option value="中" selected>中</option>
+                      <option value="低">低</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>重复</label>
+                    <select id="mRepeat">
+                      <option value="无" selected>不重复</option>
+                      <option value="重复一次">重复一次</option>
+                      <option value="重复两次">重复两次</option>
+                      <option value="一直重复">一直重复</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>五维归属</label>
+                    <div class="pill-row" id="mDimRow"></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>多日生成（勾选下周的星期几，可多选）</label>
+                  <div class="weekday-row">
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="1">周一</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="2">周二</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="3">周三</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="4">周四</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="5">周五</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="6">周六</label>
+                    <label class="weekday-pill"><input class="wday-check" type="checkbox" value="0">周日</label>
+                  </div>
+                  <div style="font-size:12px; color: var(--muted);">如果勾选，则为下周对应星期各创建 1 条任务，并以 (x/n) 统计进度；不勾选则按单日或 AI 给出的日期创建。</div>
+                </div>
+                <div class="field" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:8px;">
+                  <div class="field">
+                    <label>参与人</label>
+                    <input id="mPeople" placeholder="与谁一起" />
+                  </div>
+                  <div class="field">
+                    <label>方法/步骤</label>
+                    <input id="mMethod" placeholder="怎么做" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label>描述</label>
+                  <textarea id="mDesc" placeholder="补充细节..."></textarea>
+                </div>
+
+                <div class="field" style="border:1px solid #24222c; padding:10px; border-radius:12px;">
+                  <label style="color:#fff; font-weight:600;">预期加点（最多 2 种，每项 0-3）</label>
+                  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:8px; margin-top:6px;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                      <select id="g1Dim"></select>
+                      <input id="g1Val" type="number" min="0" max="3" value="0" style="width:60px;" />
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                      <select id="g2Dim"></select>
+                      <input id="g2Val" type="number" min="0" max="3" value="0" style="width:60px;" />
+                    </div>
+                  </div>
+                  <div style="font-size:12px; color: var(--muted);">AI 也会填充加点偏好；无特殊需求可保持 0。</div>
+                </div>
+
+                <div class="field" id="dateInfo" style="font-size:12px; color: var(--muted);"></div>
+
+                ${markDone ? `
+                  <div class="field">
+                    <label>证据（完成时可填）</label>
+                    <textarea id="mEvidence" placeholder="完成说明"></textarea>
+                    <input type="file" id="mImg" accept="image/*" />
+                    <div class="upload-preview" id="mPreview" style="display:none;"></div>
+                  </div>
+                ` : ''}
+
+                <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="primary" id="mSave">保存</button>
+                  <button id="mCancel">取消</button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          const close = () => modal.remove();
+          modal.querySelector('.close').onclick = close;
+          modal.onclick = e => { if (e.target === modal) close(); };
+          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+
+          const aiView = modal.querySelector('#aiView');
+          const formView = modal.querySelector('#formView');
+          const toggleBtn = modal.querySelector('#mToggle');
+          const showView = (mode) => {
+            if (mode === 'form') {
+              aiView.style.display = 'none';
+              formView.style.display = '';
+              toggleBtn.textContent = 'AI 模式';
+            } else {
+              aiView.style.display = '';
+              formView.style.display = 'none';
+              toggleBtn.textContent = '表单模式';
+            }
+          };
+          toggleBtn.onclick = () => {
+            const nowForm = formView.style.display !== 'none';
+            showView(nowForm ? 'ai' : 'form');
+          };
+          if (startInForm) showView('form');
+
+          const titleEl = modal.querySelector('#mTitle');
+          const dateEl = modal.querySelector('#mDate');
+          const timeEl = modal.querySelector('#mTime');
+          const locEl = modal.querySelector('#mLocation');
+          const impEl = modal.querySelector('#mImportance');
+          const repeatEl = modal.querySelector('#mRepeat');
+          const peopleEl = modal.querySelector('#mPeople');
+          const methodEl = modal.querySelector('#mMethod');
+          const descEl = modal.querySelector('#mDesc');
+          const aiTextEl = modal.querySelector('#mAiPlan');
+          const aiImgEl = modal.querySelector('#mAiImg');
+          const aiBtn = modal.querySelector('#mAiBtn');
+          const aiStatus = modal.querySelector('#mAiStatus');
+          const dateInfo = modal.querySelector('#dateInfo');
+          const g1Dim = modal.querySelector('#g1Dim');
+          const g2Dim = modal.querySelector('#g2Dim');
+          const g1Val = modal.querySelector('#g1Val');
+          const g2Val = modal.querySelector('#g2Val');
+          const weekdayChecks = Array.from(modal.querySelectorAll('.wday-check'));
+          let weekdayTouched = false;
+
+          // populate dimension select options
+          DIMENSIONS.forEach(dim => {
+            const opt1 = document.createElement('option');
+            opt1.value = dim.key;
+            opt1.textContent = dim.label;
+            const opt2 = opt1.cloneNode(true);
+            g1Dim.appendChild(opt1);
+            g2Dim.appendChild(opt2);
+          });
+
+          let pendingDates = suggestion?.dates || (dateValue ? [dateValue] : [fmtDate(state.selectedDate)]);
+
+          const dimRow = modal.querySelector('#mDimRow');
+          DIMENSIONS.forEach(dim => {
+            const pill = document.createElement('div');
+            pill.className = 'pill';
+            pill.textContent = dim.label;
+            pill.dataset.key = dim.key;
+            if ((existing?.dimension || suggestion?.dimension) === dim.key) pill.classList.add('active');
+            pill.onclick = () => {
+              dimRow.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+              pill.classList.add('active');
+            };
+            dimRow.appendChild(pill);
+          });
+          if (!dimRow.querySelector('.pill.active')) dimRow.querySelector('.pill')?.classList.add('active');
+
+          const setDateInfo = () => {
+            if (pendingDates.length > 1) {
+              dateInfo.textContent = `将创建 ${pendingDates.length} 天任务，完成进度以 (x/${pendingDates.length}) 统计，全部完成后统一加点。`;
+            } else {
+              dateInfo.textContent = '单日任务';
+            }
+          };
+
+          const buildWeekdaySetDates = (weekdays) => {
+            if (!weekdays.length) return [];
+            const today = new Date();
+            const day = today.getDay();
+            const diffToMon = (8 - day) % 7 || 7; // next Monday
+            const monday = new Date(today);
+            monday.setDate(today.getDate() + diffToMon);
+            return weekdays.map(w => {
+              const offset = ((w === 0 ? 7 : w) - 1);
+              const d = new Date(monday);
+              d.setDate(monday.getDate() + offset);
+              return fmtDate(d);
+            });
+          };
+
+          const applySuggestion = (plan) => {
+            if (!plan) return;
+            titleEl.value = plan.title || titleEl.value;
+            pendingDates = Array.isArray(plan.dates) ? plan.dates : (plan.date ? [plan.date] : pendingDates);
+            dateEl.value = pendingDates[0] || dateEl.value || dateValue;
+            timeEl.value = plan.time || timeEl.value;
+            locEl.value = plan.location || locEl.value;
+            impEl.value = plan.importance || impEl.value;
+            repeatEl.value = plan.repeat || repeatEl.value;
+            peopleEl.value = plan.people || peopleEl.value;
+            methodEl.value = plan.method || methodEl.value;
+            descEl.value = plan.description || descEl.value;
+            if (plan.dimension) {
+              const pill = dimRow.querySelector(`[data-key="${plan.dimension}"]`);
+              if (pill) {
+                dimRow.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+              }
+            }
+            const gains = plan.plannedGains && Object.keys(plan.plannedGains).length ? plan.plannedGains : { knowledge: 1, proficiency: 1 };
+            const keys = Object.keys(gains);
+            if (keys[0]) { g1Dim.value = keys[0]; g1Val.value = gains[keys[0]] ?? 0; }
+            if (keys[1]) { g2Dim.value = keys[1]; g2Val.value = gains[keys[1]] ?? 0; }
+            setDateInfo();
+          };
+
+          titleEl.value = existing?.title || suggestion?.title || '';
+          dateEl.value = suggestion?.date || dateValue;
+          timeEl.value = existing?.time || suggestion?.time || '';
+          locEl.value = existing?.location || suggestion?.location || '';
+          impEl.value = existing?.importance || suggestion?.importance || '中';
+          repeatEl.value = existing?.repeat || suggestion?.repeat || '';
+          peopleEl.value = existing?.people || suggestion?.people || '';
+          methodEl.value = existing?.method || suggestion?.method || '';
+          descEl.value = existing?.description || suggestion?.description || '';
+          applySuggestion(suggestion);
+          setDateInfo();
+
+          dateEl.onchange = () => { pendingDates = [dateEl.value]; setDateInfo(); };
+          const syncWeekdaySelection = () => {
+            weekdayTouched = true;
+            const chosen = weekdayChecks.filter(c => c.checked).map(c => Number(c.value));
+            if (chosen.length) {
+              pendingDates = buildWeekdaySetDates(chosen);
+            }
+            weekdayChecks.forEach(c => c.parentElement.classList.toggle('active', c.checked));
+            setDateInfo();
+          };
+          weekdayChecks.forEach(c => { c.onchange = syncWeekdaySelection; c.parentElement.classList.toggle('active', c.checked); });
+
+          let aiImgData = '';
+          if (aiImgEl) aiImgEl.onchange = async e => {
+            const file = e.target.files?.[0];
+            aiImgData = file ? await fileToDataURL(file) : '';
+          };
+
+          if (aiBtn) aiBtn.onclick = async () => {
+            aiStatus.textContent = 'AI 正在制定...';
+            const suggestionPlan = await aiSuggestTask(aiTextEl.value.trim(), aiImgData);
+            applySuggestion(suggestionPlan);
+            showView('form');
+            aiStatus.textContent = '已填充，已切到表单，可修改后保存。';
+          };
+
+          const evidenceEl = modal.querySelector('#mEvidence');
+          const imgInput = modal.querySelector('#mImg');
+          const preview = modal.querySelector('#mPreview');
+          let imgData = existing?.evidenceImage || '';
+          if (markDone && imgInput) {
+            if (imgData) {
+              preview.style.display = 'grid';
+              preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>已选择图片</div>`;
+            }
+            imgInput.onchange = e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                imgData = reader.result;
+                preview.style.display = 'grid';
+                preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>${file.name}</div>`;
+              };
+              reader.readAsDataURL(file);
+            };
+          }
+
+          const collectPlannedGains = () => {
+            const gains = {};
+            const v1 = Math.max(0, Math.min(3, Number(g1Val.value) || 0));
+            const v2 = Math.max(0, Math.min(3, Number(g2Val.value) || 0));
+            if (v1 > 0) gains[g1Dim.value] = v1;
+            if (v2 > 0 && g2Dim.value !== g1Dim.value) gains[g2Dim.value] = v2;
+            return gains;
+          };
+
+          const saveBtn = modal.querySelector('#mSave');
+          const cancelBtn = modal.querySelector('#mCancel');
+          cancelBtn.onclick = close;
+
+          saveBtn.onclick = () => {
+            const title = titleEl.value.trim();
+            if (!title) { alert('标题不能为空'); return; }
+            const chosenWeekdays = weekdayChecks.filter(c => c.checked).map(c => Number(c.value));
+            if (weekdayTouched && chosenWeekdays.length) {
+              pendingDates = buildWeekdaySetDates(chosenWeekdays);
+            }
+            if (!pendingDates.length) pendingDates = [dateEl.value || fmtDate(state.selectedDate)];
+            const activeDim = dimRow.querySelector('.pill.active');
+            const dimension = activeDim?.dataset.key || existing?.dimension || suggestion?.dimension || DIMENSIONS[0].key;
+            const importance = impEl.value;
+            const type = typeFromImportance(importance);
+            const plannedGains = collectPlannedGains();
+
+            const baseTask = {
+              title,
+              description: descEl.value.trim(),
+              type,
+              dimension,
+              time: timeEl.value.trim(),
+              location: locEl.value.trim(),
+              importance,
+              repeat: repeatEl.value,
+              people: peopleEl.value.trim(),
+              method: methodEl.value.trim(),
+              plannedGains,
+            };
+
+            if (isEdit) {
+              const idx = state.tasks.findIndex(t => t.id === existing.id);
+              if (idx >= 0) {
+                state.tasks[idx] = {
+                  ...state.tasks[idx],
+                  ...baseTask,
+                  date: dateEl.value || state.tasks[idx].date,
+                  status: markDone ? 'done' : state.tasks[idx].status,
+                  evidenceText: markDone ? (evidenceEl?.value.trim() || '') : state.tasks[idx].evidenceText,
+                  evidenceImage: markDone ? imgData : state.tasks[idx].evidenceImage,
+                };
+              }
+            } else if (pendingDates.length > 1) {
+              const groupId = crypto.randomUUID();
+              pendingDates.forEach((d, idx) => {
+                state.tasks.push({
+                  id: crypto.randomUUID(),
+                  groupId,
+                  groupTotal: pendingDates.length,
+                  groupAwarded: false,
+                  date: d || fmtDate(state.selectedDate),
+                  status: markDone ? 'done' : 'todo',
+                  created: Date.now() + idx,
+                  evidenceText: markDone ? (evidenceEl?.value.trim() || '') : '',
+                  evidenceImage: markDone ? imgData : '',
+                  gains: null,
+                  feedback: '',
+                  ...baseTask,
+                });
+              });
+            } else {
+              state.tasks.push({
+                id: crypto.randomUUID(),
+                date: pendingDates[0] || fmtDate(state.selectedDate),
+                status: markDone ? 'done' : 'todo',
+                created: Date.now(),
+                evidenceText: markDone ? (evidenceEl?.value.trim() || '') : '',
+                evidenceImage: markDone ? imgData : '',
+                gains: null,
+                feedback: '',
+                ...baseTask,
+              });
+            }
+
+            save();
+            renderCalendar();
+            renderTasks();
+            renderStats();
+            playCreateAnimation();
+            close();
+
+            // if edit & markDone or new & markDone -> evaluate
+            if (markDone) {
+              const last = isEdit ? existing.id : state.tasks[state.tasks.length - 1].id;
+              evaluateTask(last);
+            }
+          };
+
+          els.modalRoot.appendChild(modal);
+        }
+
+        function openQuickModal() {
+          const modal = document.createElement('div');
+          modal.className = 'modal-backdrop';
+          modal.innerHTML = `
+            <div class="modal">
+              <button class="close" aria-label="关闭">✕</button>
+              <h3>闪投 · 让 AI 制定</h3>
+              <div class="field">
+                <label>描述</label>
+                <textarea id="qDesc" placeholder="描述需求或目标，AI 将自动安排日期/时间/地点/重要程度"></textarea>
+              </div>
+              <div class="field">
+                <label>上传图片（可选）</label>
+                <input type="file" id="qImg" accept="image/*" />
+              </div>
+              <button class="primary" id="qSubmit">生成并填充</button>
+            </div>
+          `;
+          const close = () => modal.remove();
+          modal.querySelector('.close').onclick = close;
+          modal.onclick = e => { if (e.target === modal) close(); };
+          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+
+          modal.querySelector('#qSubmit').onclick = async () => {
+            const desc = modal.querySelector('#qDesc').value.trim();
+            if (!desc) { alert('请先填写描述'); return; }
+            const file = modal.querySelector('#qImg').files?.[0];
+            const imgData = file ? await fileToDataURL(file) : '';
+            const suggestion = await aiSuggestTask(desc, imgData);
+            close();
+            openTaskModal(undefined, { presetDate: suggestion.date || fmtDate(new Date()), suggestion });
+          };
+
+          els.modalRoot.appendChild(modal);
+        }
+
+        async function evaluateTask(taskId) {
+          const task = state.tasks.find(t => t.id === taskId);
+          if (!task) return;
+          setLoading(true, 'AI 评分中...');
+          if (task.groupId) {
+            const group = state.tasks.filter(t => t.groupId === task.groupId);
+            const doneCount = group.filter(t => t.status === 'done').length;
+            if (group.some(t => t.groupAwarded)) {
+              task.feedback = task.feedback || '该系列已完成并加点。';
+              save();
+              setLoading(false);
+              renderTasks();
+              renderStats();
+              return;
+            }
+            if (doneCount < group.length) {
+              task.feedback = `进度：${doneCount}/${group.length}，全部完成后统一加点。`;
+              save();
+              setLoading(false);
+              renderTasks();
+              return;
+            }
+          }
+          const { apiUrl, apiKey, modelName } = state.settings;
+          let reason = '';
+          let feedback = '';
+          let gains = task.plannedGains && Object.keys(task.plannedGains).length ? task.plannedGains : distributeXP(6);
+          const prevLevels = currentLevels();
+          if (task.gains) applyGains(task.gains, -1);
+          const authHeader = apiKey ? (apiKey.toLowerCase().startsWith('bearer ') ? apiKey : `Bearer ${apiKey}`) : '';
+          const url = (apiUrl || '').trim();
+          const looksDeepseek = url.includes('deepseek.com');
+          const looksGemini = url.includes('generativelanguage.googleapis.com') || url.includes('googleapis.com');
+          const endpoint = (() => {
+            if (looksDeepseek && !/\/v\d+\//.test(url)) return `${url.replace(/\/$/, '')}/v1/chat/completions`;
+            if (looksGemini) {
+              if (!url.includes('?key=')) {
+                const joiner = url.includes('?') ? '&' : '?';
+                return `${url}${joiner}key=${encodeURIComponent(apiKey || '')}`;
+              }
+            }
+            return url;
+          })();
+
+          if (!url || !apiKey) {
+            alert('该 ID 未设置 API URL/Key，请在设置中填写后再打分。');
+            setLoading(false);
+            return;
+          }
+
+          try {
+            const levels = currentLevels();
+            const todayIso = fmtDate(new Date());
+            const body = looksDeepseek ? {
+              model: modelName || 'deepseek-chat',
+              stream: false,
+              messages: [
+                { role: 'system', content: 'You are an assistant that scores a user task. Return pure JSON only: {"gains":{"knowledge":int,"charm":int,"guts":int,"proficiency":int,"kindness":int},"reason":string}. Each dimension has level 0-5; higher levels are harder to increase. Keep each gain between 0 and 3, prefer 0-1 when levels are already high. Reason should explain why these points were allocated.' },
+                { role: 'user', content: `当前日期: ${todayIso}\n当前等级: ${JSON.stringify(levels)}\n任务类型: ${task.type || 'main'}\n任务标题: ${task.title}\n描述: ${task.description || ''}\n证据: ${task.evidenceText || ''}` },
+              ],
+            } : looksGemini ? {
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    { text: `你是评分助手，请返回 JSON：{"gains":{"knowledge":int,"charm":int,"guts":int,"proficiency":int,"kindness":int},"reason":string}。每个增量 0-3，等级 0-5 越高越难提升。只返回 JSON。当前日期: ${todayIso}。当前等级: ${JSON.stringify(levels)}。任务类型: ${task.type || 'main'}。任务标题: ${task.title}\n描述: ${task.description || ''}\n证据: ${task.evidenceText || ''}` },
+                  ],
+                },
+              ],
+              generationConfig: { temperature: 0.3 },
+            } : {
+              title: task.title,
+              description: task.description,
+              evidenceText: task.evidenceText,
+              evidenceImage: task.evidenceImage,
+              currentLevels: levels,
+              type: task.type || 'main',
+              today: todayIso,
+            };
+
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(!looksGemini && authHeader ? { 'Authorization': authHeader } : {}),
+                ...(modelName && !looksDeepseek && !looksGemini ? { 'X-Model': modelName } : {}),
+              },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+            }
+            const data = await res.json().catch(() => ({}));
+            if (looksDeepseek) {
+              const raw = data.choices?.[0]?.message?.content?.trim?.();
+              const parsed = raw ? JSON.parse(raw) : {};
+              gains = parsed.gains || gains;
+              reason = parsed.reason || '';
+              feedback = parsed.feedback || reason || 'AI 已完成评分。';
+            } else if (looksGemini) {
+              const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.();
+              const parsed = raw ? JSON.parse(raw) : {};
+              gains = parsed.gains || gains;
+              reason = parsed.reason || '';
+              feedback = parsed.feedback || reason || 'AI 已完成评分。';
+            } else {
+              gains = data.gains || gains;
+              reason = data.reason || '';
+              feedback = data.feedback || reason || 'AI 已完成评分。';
+            }
+          } catch (err) {
+            console.error('AI 调用失败', err);
+            alert(`API 调用失败：${err.message}`);
+            setLoading(false);
+            return;
+          }
+
+          // Penalize vague evidence/description
+          const textSignal = `${task.description || ''} ${task.evidenceText || ''}`.trim().length;
+          if (textSignal < 8) {
+            gains = { knowledge: 0, charm: 0, guts: 0, proficiency: 0, kindness: 0 };
+          } else if (textSignal < 25) {
+            gains = Object.fromEntries(Object.entries(gains).map(([k,v]) => [k, Math.min(1, v || 0)]));
+          }
+
+          const totalGain = Object.values(gains).reduce((a, b) => a + (b || 0), 0);
+          if (totalGain <= 0) {
+            task.status = 'todo';
+            task.feedback = '信息不足，未加点，任务未完成。请补充证据后再试。';
+            save();
+            setLoading(false);
+            renderStats();
+            renderTasks();
+            return;
+          }
+
+          applyGains(gains, 1);
+          playGainAnimation(gains, prevLevels);
+          if (task.groupId) {
+            state.tasks.filter(t => t.groupId === task.groupId).forEach(t => {
+              t.gains = gains;
+              t.groupAwarded = true;
+              const reasonText = reason || feedback || 'AI 未提供理由';
+              t.feedback = `理由：${reasonText} ｜加点：+${Object.entries(gains).map(([k,v]) => `${v} ${DIMENSIONS.find(d=>d.key===k)?.label||''}`).join(' / ')}`;
+            });
+          } else {
+            task.gains = gains;
+            const reasonText = reason || feedback || 'AI 未提供理由';
+            task.feedback = `理由：${reasonText} ｜加点：+${Object.entries(gains).map(([k,v]) => `${v} ${DIMENSIONS.find(d=>d.key===k)?.label||''}`).join(' / ')}`;
+          }
+          save();
+          renderStats();
+          renderTasks();
+          setLoading(false);
+        }
+
+        function distributeXP(total) {
+          const gains = {};
+          let remaining = total;
+          DIMENSIONS.forEach((dim, idx) => {
+            const portion = idx === DIMENSIONS.length - 1 ? remaining : Math.max(0, Math.round(Math.random() * Math.min(3, remaining)));
+            gains[dim.key] = portion;
+            remaining -= portion;
+          });
+          return gains;
+        }
+
+        async function testApiConnection(settings) {
+          const { apiUrl, apiKey, modelName } = settings || state.settings;
+          const url = (apiUrl || '').trim();
+          if (!url || !apiKey) throw new Error('请先填写 API URL 和 Key');
+          const looksDeepseek = url.includes('deepseek.com');
+          const looksGemini = url.includes('generativelanguage.googleapis.com') || url.includes('googleapis.com');
+          const authHeader = apiKey.toLowerCase().startsWith('bearer ') ? apiKey : `Bearer ${apiKey}`;
+          const endpoint = (() => {
+            if (looksDeepseek && !/\/v\d+\//.test(url)) return `${url.replace(/\/$/, '')}/v1/chat/completions`;
+            if (looksGemini) {
+              if (!url.includes('?key=')) {
+                const joiner = url.includes('?') ? '&' : '?';
+                return `${url}${joiner}key=${encodeURIComponent(apiKey || '')}`;
+              }
+            }
+            return url;
+          })();
+
+          const body = looksDeepseek ? {
+            model: modelName || 'deepseek-chat',
+            stream: false,
+            messages: [
+              { role: 'system', content: '只返回 JSON {"ok":true}' },
+              { role: 'user', content: 'ping' },
+            ],
+          } : looksGemini ? {
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { text: '只返回 JSON {"ok":true}' },
+                ],
+              },
+            ],
+            generationConfig: { temperature: 0 },
+          } : { test: true };
+
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(!looksGemini ? { 'Authorization': authHeader } : {}),
+              ...(modelName && !looksDeepseek && !looksGemini ? { 'X-Model': modelName } : {}),
+            },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`HTTP ${res.status} ${res.statusText}: ${text.slice(0, 160)}`);
+          }
+          const data = await res.json().catch(() => ({}));
+          const raw = looksDeepseek ? data.choices?.[0]?.message?.content?.trim?.() : looksGemini ? data.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.() : (data.ok !== undefined ? JSON.stringify({ ok: data.ok }) : '');
+          let parsed = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
+          if (looksGemini && !raw) parsed = data;
+          if (!parsed || parsed.ok !== true) throw new Error('API 返回异常，未包含 ok=true');
+          return true;
+        }
+
+        function bindEvents() {
+          els.addToday.onclick = () => {
+            const today = new Date();
+            state.selectedDate = today;
+            state.monthCursor = today;
+            save();
+            renderCalendar();
+            renderTasks();
+            openDayModal(fmtDate(today));
+          };
+          els.prevMonth.onclick = () => { state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() - 1, 1); save(); renderCalendar(); };
+          els.nextMonth.onclick = () => { state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + 1, 1); save(); renderCalendar(); };
+
+          const setSettingsVisible = visible => {
+            els.settingsDrawer.classList.toggle('open', visible);
+          };
+          setSettingsVisible(false);
+          els.settingsToggle.onclick = () => {
+            const nowVisible = !els.settingsDrawer.classList.contains('open');
+            setSettingsVisible(nowVisible);
+          };
+
+          const setCalendarVisible = visible => {
+            els.calendarDrawer.classList.toggle('open', visible);
+          };
+          setCalendarVisible(false);
+          els.calendarToggle.onclick = () => setCalendarVisible(!els.calendarDrawer.classList.contains('open'));
+          els.calendarClose.onclick = () => setCalendarVisible(false);
+
+          els.saveSettings.onclick = async () => {
+            state.settings = {
+              apiUrl: els.apiUrl.value.trim(),
+              apiKey: els.apiKey.value.trim(),
+              modelName: els.modelName.value.trim(),
+              username: els.username.value.trim(),
+              useCloud: els.useCloud.checked,
+              authMode: 'anonymous',
+            };
+            save();
+            setLoading(true, '测试 API 可用性...');
+            try {
+              await testApiConnection(state.settings);
+              alert('API 测试成功，配置已生效。');
+              if (state.settings.useCloud) {
+                updateCloudStatus('保存并上传中...');
+                await saveRemote();
+              }
+            } catch (err) {
+              console.error('API 测试失败', err);
+              alert(`API 测试失败：${err.message || err}. 请检查 URL/Key 后重试。`);
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          if (els.username) {
+            els.username.setAttribute('readonly', 'readonly');
+          }
+
+          els.useCloud.onchange = () => {
+            state.settings.useCloud = els.useCloud.checked;
+            save();
+            if (state.settings.useCloud) loadRemote();
+            else updateCloudStatus('已关闭云同步，仅本地保存');
+          };
+
+          els.connectCloud.onclick = async () => {
+            if (!state.settings.useCloud) {
+              state.settings.useCloud = true;
+              els.useCloud.checked = true;
+            }
+            updateCloudStatus('连接中...');
+            await loadRemote();
+          };
+
+          if (els.manualSync) {
+            els.manualSync.onclick = async () => {
+              if (!state.settings.username.trim()) {
+                updateCloudStatus('请先在 Gate 或设置输入 ID', true);
+                showGate(true);
+                return;
+              }
+              if (!state.settings.useCloud) {
+                state.settings.useCloud = true;
+                els.useCloud.checked = true;
+              }
+              updateCloudStatus('保存并上传中...');
+              saveLocal();
+              await saveRemote();
+            };
+          }
+
+          if (els.gateEnter) {
+            els.gateEnter.onclick = () => handleGate('check');
+          }
+          if (els.gateCreate) {
+            els.gateCreate.onclick = () => handleGate('create');
+          }
+          if (els.gateOffline) {
+            els.gateOffline.onclick = () => {
+              state.settings.useCloud = false;
+              els.useCloud.checked = false;
+              showGate(false);
+              if (els.appShell) els.appShell.classList.remove('hidden');
+              renderWeekdays();
+              renderStats();
+              renderCalendar();
+              renderTasks();
+              saveLocal();
+            };
+          }
+
+          els.clearStats.onclick = () => {
+            if (!confirm('确认清除五维点数吗？此操作不可撤销。')) return;
+            DIMENSIONS.forEach(dim => { state.stats[dim.key] = 0; });
+            save();
+            renderStats();
+            alert('五维点数已清除。');
+          };
+
+          els.clearAll.onclick = () => {
+            if (!confirm('确认清除所有数据（任务、点数、设置）吗？此操作不可撤销。')) return;
+            localStorage.removeItem('persona-planner');
+            state.tasks = [];
+            DIMENSIONS.forEach(dim => { state.stats[dim.key] = 0; });
+            state.settings = { apiUrl: '', apiKey: '', modelName: '', username: '', useCloud: false, authMode: 'anonymous' };
+            state.selectedDate = new Date();
+            state.monthCursor = new Date();
+            renderStats();
+            renderCalendar();
+            renderTasks();
+            els.apiUrl.value = '';
+            els.apiKey.value = '';
+            els.modelName.value = '';
+            els.username.value = '';
+            els.useCloud.checked = false;
+            updateCloudStatus('未连接');
+            alert('所有数据已清除。');
+          };
+
+          els.logoutBtn.onclick = async () => {
+            state.settings.username = '';
+            state.settings.useCloud = false;
+            state.userId = '';
+            if (els.username) els.username.value = '';
+            if (els.useCloud) els.useCloud.checked = false;
+            try {
+              const { auth } = await ensureFirebase();
+              await auth.signOut();
+            } catch (err) {
+              console.warn('退出登录时出错', err?.message);
+            }
+            saveLocal();
+            updateCloudStatus('已退出，请重新通过 ID 门认证');
+            showGate(true);
+          };
+
+          els.quickBtn.onclick = () => openQuickModal();
+        }
+
+        function fileToDataURL(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+
+        function init() {
+          load();
+          bindEvents();
+          els.apiUrl.value = state.settings.apiUrl;
+          els.apiKey.value = state.settings.apiKey;
+          els.modelName.value = state.settings.modelName;
+          els.username.value = state.settings.username || '';
+          if (els.username) els.username.setAttribute('readonly', 'readonly');
+          els.useCloud.checked = !!state.settings.useCloud;
+
+          const hasId = !!(state.settings.username || '').trim();
+          if (!hasId) {
+            showGate(true);
+            updateCloudStatus('请输入 ID 后进入');
+          } else {
+            if (els.appShell) els.appShell.classList.remove('hidden');
+            renderWeekdays();
+            renderStats();
+            renderCalendar();
+            renderTasks();
+            if (state.settings.useCloud) {
+              updateCloudStatus('尝试同步云端...');
+              loadRemote();
+            }
+          }
+        }
+
+        init();
+  </script>
+</body>
+</html>
