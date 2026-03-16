@@ -168,6 +168,8 @@
     .stat .label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
     .bar { height: 8px; background: #1f1d24; border-radius: 999px; overflow: hidden; margin-top: 8px; }
     .bar span { display: block; height: 100%; background: linear-gradient(90deg, #ffb300, #ffe082); box-shadow: 0 0 12px rgba(255, 197, 66, 0.6); transition: width 0.45s ease; }
+    .bar span.flash { animation: barFlash 0.6s ease; }
+    @keyframes barFlash { 0% { box-shadow: 0 0 0 rgba(255, 206, 0, 0.6); } 50% { box-shadow: 0 0 16px rgba(255, 206, 0, 0.9); } 100% { box-shadow: 0 0 0 rgba(255, 206, 0, 0.0); } }
     #radarCanvas { width: 100%; height: 260px; display: block; margin-top: 10px; }
 
     /* Calendar */
@@ -466,6 +468,45 @@
     .hour-chip { min-width:58px; padding:6px; border:1px solid #24222c; border-radius:10px; background:#0f0e15; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; box-shadow:1px 1px 0 #000; }
     .hour-chip .h-temp { font-weight:700; }
     .hour-chip .h-time { color: var(--muted); font-size:11px; }
+    .hour-chip.current { border-color: #ffce00; box-shadow: 0 0 10px rgba(255,206,0,0.6); }
+    .hour-chip .h-now { color:#ffce00; font-size:11px; font-weight:800; letter-spacing:0.3px; }
+
+    .gain-fly {
+      position: fixed;
+      left: 0;
+      top: 0;
+      transform: translate(-50%, -50%);
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      color: #ffce00;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+      pointer-events: none;
+      z-index: 140;
+      filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45));
+    }
+    .label-pulse {
+      position: fixed;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #ffce00;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.6);
+      animation: pulseHit 0.45s ease-out forwards;
+      pointer-events: none;
+      z-index: 120;
+      box-shadow: 0 0 12px rgba(255,206,0,0.6);
+    }
+    @keyframes pulseHit {
+      0% { opacity: 0.9; transform: translate(-50%, -50%) scale(0.6); }
+      70% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.4); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+    }
+
+    @media (max-width: 720px) {
+      .weather-now { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .weather-hourly { width: 100%; padding: 6px 2px 2px; }
+      .hour-chip { min-width: 52px; padding: 5px; font-size: 11px; }
+    }
 
     .hero.weather-rain::after,
     .hero.weather-snow::after,
@@ -799,7 +840,10 @@
             <label style="color:#fff; font-weight:600;">天气预报（未来 3 天）</label>
             <label>城市 / 地点</label>
             <input id="weatherLocation" placeholder="例如 Beijing 或 Shanghai" />
-            <button id="refreshWeather" style="margin-top:6px;">刷新天气</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+              <button id="refreshWeather">刷新天气</button>
+              <button id="locateWeather" class="ghost-btn" style="position:static; clip-path: var(--poly-a);">使用定位</button>
+            </div>
             <div style="font-size:12px; color: var(--muted);">使用 open-meteo 免费接口，无需 Key。日历显示可查到的温度和天气，首页显示今日天气，极端天气会高亮提示。</div>
           </div>
 
@@ -869,6 +913,8 @@
       { key: 'kindness', label: '仁德' },
     ];
 
+    const labelTargets = {};
+
         const LEVEL_THRESHOLDS = [0, 30, 80, 150, 240, 360];
         const weekdays = ['日','一','二','三','四','五','六'];
 
@@ -921,6 +967,7 @@
           fxLayer: document.getElementById('fxLayer'),
           weatherLocation: document.getElementById('weatherLocation'),
           refreshWeather: document.getElementById('refreshWeather'),
+          locateWeather: document.getElementById('locateWeather'),
           weatherNow: document.getElementById('weatherNow'),
           exportIcs: document.getElementById('exportIcs'),
           importIcs: document.getElementById('importIcs'),
@@ -961,6 +1008,7 @@
             ? Object.entries(gains).map(([k,v]) => `${DIMENSIONS.find(d=>d.key===k)?.label||k}+${v}`).join(' / ')
             : '未加点';
           spawnFX('gain-burst', summary);
+          flyGainsToRadar(gains);
           playXpTicker(gains);
           playLevelUp(prevLevels);
         };
@@ -986,6 +1034,60 @@
             if (after > before) {
               spawnFX('level-up', `${dim.label} Lv.${before} → Lv.${after}`, { x: 50, y: 30, life: 1500 });
             }
+          });
+        };
+
+        const flashBar = (dimKey) => {
+          const bar = els.statGrid?.querySelector(`span[data-dim="${dimKey}"]`);
+          if (!bar) return;
+          bar.classList.remove('flash');
+          // force reflow to restart animation
+          void bar.offsetWidth;
+          bar.classList.add('flash');
+        };
+
+        const triggerLabelPulse = (dimKey) => {
+          const target = labelTargets[dimKey];
+          if (!target) return;
+          const pulse = document.createElement('div');
+          pulse.className = 'label-pulse';
+          pulse.style.left = `${target.x}px`;
+          pulse.style.top = `${target.y}px`;
+          document.body.appendChild(pulse);
+          pulse.addEventListener('animationend', () => pulse.remove());
+        };
+
+        const flyGainsToRadar = (gains) => {
+          if (!gains) return;
+          const heroRect = els.hero?.getBoundingClientRect();
+          const startX = heroRect ? heroRect.left + heroRect.width * 0.5 : window.innerWidth * 0.5;
+          const startY = heroRect ? heroRect.top + heroRect.height * 0.25 : window.innerHeight * 0.25;
+          Object.entries(gains).forEach(([key, val]) => {
+            if (!val) return;
+            const target = labelTargets[key];
+            const label = DIMENSIONS.find(d => d.key === key)?.label || key;
+            const node = document.createElement('div');
+            node.className = 'gain-fly';
+            node.textContent = `${label}+${val}`;
+            node.style.opacity = '0';
+            node.style.transform = `translate(${startX}px, ${startY}px) scale(0.9)`;
+            node.style.transition = 'transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.9s ease';
+            document.body.appendChild(node);
+            requestAnimationFrame(() => {
+              const jitterX = (Math.random() * 40) - 20;
+              const jitterY = (Math.random() * 40) - 20;
+              const tx = (target?.x ?? startX) + jitterX;
+              const ty = (target?.y ?? startY) + jitterY;
+              node.style.opacity = '1';
+              node.style.transform = `translate(${tx}px, ${ty}px) scale(0.66)`;
+            });
+            node.addEventListener('transitionend', () => {
+              node.remove();
+              if (target) {
+                triggerLabelPulse(key);
+                flashBar(key);
+              }
+            }, { once: true });
           });
         };
 
@@ -1070,18 +1172,33 @@
           ].filter(Boolean).join(' · ');
 
           const hourly = hourlyList.filter(h => h.date === selectedIso).slice(0, 24);
+          const now = new Date();
+          const isToday = fmtDate(now) === selectedIso;
+          const currentHour = now.getHours();
+          const currentIdx = isToday ? hourly.findIndex(h => Number(h.hour) >= currentHour) : 0;
           const hourlyHtml = hourly.length
-            ? `<div class="weather-hourly">${hourly.map(h => {
+            ? `<div class="weather-hourly">${hourly.map((h, idx) => {
                 const hi = weatherInfo(h.code);
                 const tag = `${h.hour || '--'}时`;
                 const hTemp = h.temp != null ? `${Math.round(h.temp)}°` : '--';
-                return `<div class="hour-chip"><span class="h-time">${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp">${hTemp}</span></div>`;
+                const isNow = isToday && Number(h.hour) === currentHour;
+                return `<div class="hour-chip${idx === currentIdx ? ' current' : ''}" data-idx="${idx}"><span class="h-time">${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp">${hTemp}</span>${isNow ? '<span class="h-now">现在</span>' : ''}</div>`;
               }).join('')}</div>`
             : `<div class="weather-hourly" style="opacity:0.7;">无小时预报</div>`;
 
           box.innerHTML = `${alert}<span class="w-icon">${info.icon}</span><div style="display:flex; flex-direction:column; gap:2px; min-width:140px;"><span class="w-temp">${temp}</span><span class="w-desc">${detailParts}</span></div><span class="w-city">${city} · ${selectedIso} 周${weekdayLabel}</span>${hourlyHtml}`;
           box.style.display = 'flex';
           applyWeatherFx(info);
+
+          // align current hour to the left on mobile/desktop
+          const hourlyEl = box.querySelector('.weather-hourly');
+          if (hourlyEl && currentIdx >= 0) {
+            const chip = hourlyEl.querySelector(`[data-idx="${currentIdx}"]`);
+            if (chip) {
+              const offset = chip.offsetLeft - 6;
+              hourlyEl.scrollTo({ left: offset > 0 ? offset : 0, behavior: 'auto' });
+            }
+          }
         };
 
         const setWeatherForecast = (list = [], hourly = []) => {
@@ -1683,7 +1800,7 @@
             div.className = 'stat';
             div.innerHTML = `
               <div class="label"><span>${dim.label}</span><span>Lv.${lvl} / 5</span></div>
-              <div class="bar"><span style="width:${pct}%;"></span></div>
+              <div class="bar"><span data-dim="${dim.key}" style="width:${pct}%;"></span></div>
             `;
             els.statGrid.appendChild(div);
           });
@@ -1793,6 +1910,10 @@
             ctx.strokeText(dim.label, 0, 0);
             ctx.fillText(dim.label, 0, 0);
             ctx.restore();
+
+            // store screen coords for fly-to animation
+            const rect = canvas.getBoundingClientRect();
+            labelTargets[dim.key] = { x: rect.left + tx, y: rect.top + ty };
           });
         }
 
@@ -2051,6 +2172,8 @@
           modal.querySelector('#dEdit').onclick = () => { close(); openTaskModal(task, { presetDate: task.date }); };
           modal.querySelector('#dComplete').onclick = () => { close(); openCompleteModal(task.id); };
           modal.querySelector('#dDelete').onclick = () => {
+            const ok = confirm('确认删除该任务？已获得的加点会被撤销。');
+            if (!ok) return;
             if (task.gains) applyGains(task.gains, -1);
             state.tasks = state.tasks.filter(t => t.id !== task.id);
             save();
@@ -3253,6 +3376,31 @@
             };
           }
 
+          if (els.locateWeather) {
+            els.locateWeather.onclick = async () => {
+              try {
+                setLoading(true, '获取定位...');
+                const pos = await new Promise((resolve, reject) => {
+                  if (!navigator.geolocation) return reject(new Error('浏览器不支持定位'));
+                  const t = setTimeout(() => reject(new Error('定位超时')), 6000);
+                  navigator.geolocation.getCurrentPosition(
+                    (p) => { clearTimeout(t); resolve(p); },
+                    (e) => { clearTimeout(t); reject(e); },
+                    { enableHighAccuracy: false, timeout: 6000 }
+                  );
+                });
+                const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                els.weatherLocation.value = '当前位置';
+                await fetchWeather('', coords);
+                alert('已使用当前定位更新天气');
+              } catch (err) {
+                alert(`定位获取失败：${err.message}`);
+              } finally {
+                setLoading(false);
+              }
+            };
+          }
+
           els.connectCloud.onclick = async () => {
             updateCloudStatus('连接中...');
             await syncCloud('auto');
@@ -3386,6 +3534,9 @@
           } else {
             renderWeatherNow();
           }
+
+          // 每 5 分钟刷新一次天气展示的时间标注（不重新拉接口）
+          setInterval(() => renderWeatherNow(), 5 * 60 * 1000);
         }
 
         init();
