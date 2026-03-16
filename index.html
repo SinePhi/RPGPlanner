@@ -915,6 +915,11 @@
     ];
 
     const labelTargets = {};
+    let weatherTick = null;
+    let lastSelectedDayEl = null;
+    let lastWeatherRenderKey = '';
+    let lastStatsKey = '';
+    let lastTasksKey = '';
 
         const LEVEL_THRESHOLDS = [0, 30, 80, 150, 240, 360];
         const weekdays = ['日','一','二','三','四','五','六'];
@@ -935,6 +940,9 @@
           calendarDrawer: document.getElementById('calendarDrawer'),
           calendarToggle: document.getElementById('calendarToggle'),
           calendarClose: document.getElementById('calendarClose'),
+          // cached containers for partial updates
+          mainTaskList: document.getElementById('mainTaskList'),
+          sideTaskList: document.getElementById('sideTaskList'),
           settingsToggle: document.getElementById('settingsToggle'),
           settingsPanel: document.getElementById('settingsPanel'),
           settingsDrawer: document.getElementById('settingsDrawer'),
@@ -1005,9 +1013,8 @@
         };
 
         const playGainAnimation = (gains, prevLevels) => {
-          const summary = gains && Object.keys(gains).length
-            ? Object.entries(gains).map(([k,v]) => `${DIMENSIONS.find(d=>d.key===k)?.label||k}+${v}`).join(' / ')
-            : '未加点';
+          if (!gains || !Object.keys(gains).length) return;
+          const summary = Object.entries(gains).map(([k,v]) => `${DIMENSIONS.find(d=>d.key===k)?.label||k}+${v}`).join(' / ');
           spawnFX('gain-burst', summary);
           flyGainsToRadar(gains);
           playXpTicker(gains);
@@ -1091,16 +1098,13 @@
             }, { once: true });
           });
         };
-
-        const maskPin = (pin = '') => pin ? '●'.repeat(pin.length) : '未设置';
-
         const WEATHER_CODES = {
           0: { icon: '☀️', label: '晴' },
-          1: { icon: '🌤', label: '多云' },
-          2: { icon: '⛅️', label: '间云' },
+          1: { icon: '🌤', label: '少云' },
+          2: { icon: '⛅️', label: '多云' },
           3: { icon: '☁️', label: '阴' },
           45: { icon: '🌫', label: '雾' },
-          48: { icon: '🌫', label: '雾' },
+          48: { icon: '🌫', label: '浓雾' },
           51: { icon: '🌦', label: '小雨', extreme: true },
           53: { icon: '🌧', label: '中雨', extreme: true },
           55: { icon: '🌧', label: '大雨', extreme: true },
@@ -1133,7 +1137,6 @@
           hero.classList.remove('weather-rain','weather-snow','weather-wind');
           if (!info) return;
           if (info.extreme) {
-            // rain/snow/thunder all treated as rain overlay
             hero.classList.add('weather-rain');
             return;
           }
@@ -1158,7 +1161,18 @@
           if (!forecast) {
             box.innerHTML = `<span class="w-icon">ℹ️</span><div style="display:flex; flex-direction:column; gap:2px;"><span class="w-temp">无预报</span><span class="w-city">${city} · 仅覆盖未来 3 天</span></div>`;
             box.style.display = 'flex';
+            lastWeatherRenderKey = `none-${selectedIso}-${city}`;
             applyWeatherFx(null);
+            return;
+          }
+
+          const hourly = hourlyList.filter(h => h.date === selectedIso).slice(0, 24);
+          const now = new Date();
+          const isToday = fmtDate(now) === selectedIso;
+          const currentHour = now.getHours();
+          const currentIdx = isToday ? hourly.findIndex(h => Number(h.hour) >= currentHour) : 0;
+          const renderKey = `${selectedIso}-${city}-${hourly.length}-${isToday ? currentHour : 'na'}-${forecast.code}-${forecast.min}-${forecast.max}`;
+          if (renderKey === lastWeatherRenderKey) {
             return;
           }
 
@@ -1172,11 +1186,6 @@
             forecast.wind != null ? `风速 ${Math.round(forecast.wind)} km/h` : '',
           ].filter(Boolean).join(' · ');
 
-          const hourly = hourlyList.filter(h => h.date === selectedIso).slice(0, 24);
-          const now = new Date();
-          const isToday = fmtDate(now) === selectedIso;
-          const currentHour = now.getHours();
-          const currentIdx = isToday ? hourly.findIndex(h => Number(h.hour) >= currentHour) : 0;
           const hourlyHtml = hourly.length
             ? `<div class="weather-hourly">${hourly.map((h, idx) => {
                 const hi = weatherInfo(h.code);
@@ -1190,8 +1199,8 @@
           box.innerHTML = `${alert}<span class="w-icon">${info.icon}</span><div style="display:flex; flex-direction:column; gap:2px; min-width:140px;"><span class="w-temp">${temp}</span><span class="w-desc">${detailParts}</span></div><span class="w-city">${city} · ${selectedIso} 周${weekdayLabel}</span>${hourlyHtml}`;
           box.style.display = 'flex';
           applyWeatherFx(info);
+          lastWeatherRenderKey = renderKey;
 
-          // align current hour to the left on mobile/desktop
           const hourlyEl = box.querySelector('.weather-hourly');
           if (hourlyEl) {
             const chip = currentIdx >= 0 ? hourlyEl.querySelector(`[data-idx="${currentIdx}"]`) : null;
@@ -1525,6 +1534,8 @@
           localStorage.setItem('persona-planner', JSON.stringify(payload));
         }
 
+        const saveLocalDebounced = debounce(() => saveLocal(), 300);
+
         const cloud = { app: null, db: null, auth: null };
 
         const updateCloudStatus = (msg, isError = false) => {
@@ -1777,7 +1788,7 @@
         };
 
         function save() {
-          saveLocal();
+          saveLocalDebounced();
           if (state.settings.useCloud) saveRemoteDebounced();
         }
 
@@ -1813,6 +1824,10 @@
         };
 
         function renderStats() {
+          const statsKey = DIMENSIONS.map(dim => state.stats[dim.key] || 0).join(',');
+          if (statsKey === lastStatsKey) return;
+          lastStatsKey = statsKey;
+
           els.statGrid.innerHTML = '';
           DIMENSIONS.forEach(dim => {
             const xp = state.stats[dim.key] || 0;
@@ -1952,22 +1967,25 @@
         const typeFromImportance = (imp) => (imp === '低' ? 'side' : 'main');
 
         function renderTasks() {
+          const taskKey = state.tasks.map(t => `${t.id}|${t.status}|${t.date}|${t.title||''}|${t.time||''}|${t.location||''}|${t.type||''}|${t.importance||''}|${t.dimension||''}|${t.groupId||''}`).join('~');
+          if (taskKey === lastTasksKey) return;
+          lastTasksKey = taskKey;
+
           const today = fmtDate(new Date());
           const importanceOrder = { '高': 0, '中': 1, '低': 2 };
-          const list = [...state.tasks]
-            .sort((a, b) => {
-              const aToday = a.date === today ? 0 : 1;
-              const bToday = b.date === today ? 0 : 1;
-              if (aToday !== bToday) return aToday - bToday; // 今日任务优先
-              const ia = importanceOrder[a.importance] ?? 1;
-              const ib = importanceOrder[b.importance] ?? 1;
-              if (ia !== ib) return ia - ib; // 高优先级在前
-              if (a.date !== b.date) return a.date.localeCompare(b.date); // 其余按日期排序
-              const ta = a.time || '';
-              const tb = b.time || '';
-              if (ta !== tb) return ta.localeCompare(tb);
-              return (a.created || 0) - (b.created || 0);
-            });
+          const list = state.tasks.slice().sort((a, b) => {
+            const aToday = a.date === today ? 0 : 1;
+            const bToday = b.date === today ? 0 : 1;
+            if (aToday !== bToday) return aToday - bToday; // 今日任务优先
+            const ia = importanceOrder[a.importance] ?? 1;
+            const ib = importanceOrder[b.importance] ?? 1;
+            if (ia !== ib) return ia - ib; // 高优先级在前
+            if (a.date !== b.date) return a.date.localeCompare(b.date); // 其余按日期排序
+            const ta = a.time || '';
+            const tb = b.time || '';
+            if (ta !== tb) return ta.localeCompare(tb);
+            return (a.created || 0) - (b.created || 0);
+          });
           const main = list.filter(t => t.type !== 'side');
           const side = list.filter(t => t.type === 'side');
 
@@ -2061,6 +2079,12 @@
           });
         }
 
+        function updateCalendarSelection(newEl) {
+          if (lastSelectedDayEl && lastSelectedDayEl !== newEl) lastSelectedDayEl.classList.remove('selected');
+          if (newEl) newEl.classList.add('selected');
+          lastSelectedDayEl = newEl;
+        }
+
         function renderCalendar() {
           const cursor = state.monthCursor;
           const year = cursor.getFullYear();
@@ -2082,14 +2106,18 @@
             const iso = fmtDate(date);
             const dayEl = document.createElement('div');
             dayEl.className = 'day';
-            if (fmtDate(state.selectedDate) === iso) dayEl.classList.add('selected');
-            const hasTasks = state.tasks.filter(t => t.date === iso).length;
+            if (fmtDate(state.selectedDate) === iso) {
+              dayEl.classList.add('selected');
+              lastSelectedDayEl = dayEl;
+            }
+            let hasTasks = 0;
+            for (const t of state.tasks) { if (t.date === iso) hasTasks++; }
             const weatherSnippet = dayWeatherTag(iso);
             dayEl.innerHTML = `<div class="num">${day}</div>${hasTasks ? `<div class="tag">${hasTasks}</div>` : ''}${weatherSnippet}`;
             dayEl.onclick = () => {
               state.selectedDate = date;
               save();
-              renderCalendar();
+              updateCalendarSelection(dayEl);
               renderTasks();
               renderWeatherNow();
             };
@@ -3570,7 +3598,9 @@
           }
 
           // 每 5 分钟刷新一次天气展示的时间标注（不重新拉接口）
-          setInterval(() => renderWeatherNow(), 5 * 60 * 1000);
+          if (weatherTick) clearInterval(weatherTick);
+          weatherTick = setInterval(() => renderWeatherNow(), 5 * 60 * 1000);
+          window.addEventListener('beforeunload', saveLocal);
         }
 
         init();
