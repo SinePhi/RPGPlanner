@@ -988,6 +988,7 @@
             modal.remove();
             pendingGatePin = pinVal || '';
             if (els.passStatus && state.settings.passcode) els.passStatus.textContent = maskPin(state.settings.passcode);
+            save();
             handleGate(nextMode, pinVal);
           };
 
