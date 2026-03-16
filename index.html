@@ -2625,6 +2625,17 @@
           try {
             const levels = currentLevels();
             const todayIso = fmtDate(new Date());
+            const parseJSONSafe = (text) => {
+              if (!text) return {};
+              const cleaned = text.replace(/```[a-zA-Z]*\s*([\s\S]*?)```/g, '$1').trim();
+              const candidates = [cleaned];
+              const brace = cleaned.match(/\{[\s\S]*\}/);
+              if (brace) candidates.unshift(brace[0]);
+              for (const c of candidates) {
+                try { return JSON.parse(c); } catch (err) { /* keep trying */ }
+              }
+              return {};
+            };
             const body = looksDeepseek ? {
               model: modelName || 'deepseek-chat',
               stream: false,
@@ -2668,13 +2679,13 @@
             const data = await res.json().catch(() => ({}));
             if (looksDeepseek) {
               const raw = data.choices?.[0]?.message?.content?.trim?.();
-              const parsed = raw ? JSON.parse(raw) : {};
+              const parsed = parseJSONSafe(raw);
               gains = parsed.gains || gains;
               reason = parsed.reason || '';
               feedback = parsed.feedback || reason || 'AI 已完成评分。';
             } else if (looksGemini) {
               const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.();
-              const parsed = raw ? JSON.parse(raw) : {};
+              const parsed = parseJSONSafe(raw);
               gains = parsed.gains || gains;
               reason = parsed.reason || '';
               feedback = parsed.feedback || reason || 'AI 已完成评分。';
