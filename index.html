@@ -462,7 +462,7 @@
       align-items: center;
       justify-content: center;
       background: rgba(0,0,0,0.72);
-      z-index: 30;
+      z-index: 90;
       backdrop-filter: blur(6px);
     }
     #aiLoading.show { display: flex; }
@@ -479,7 +479,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes glow { 0%,100% { box-shadow: 0 0 18px var(--glow-accent); } 50% { box-shadow: 0 0 32px var(--glow-accent); } }
 
-    #fxLayer { position: fixed; inset: 0; pointer-events: none; z-index: 25; overflow: hidden; }
+    #fxLayer { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden; }
     .gain-burst, .create-burst, .xp-ticker, .level-up {
       position: absolute;
       left: 50%;
@@ -787,6 +787,8 @@
       userId: '',
     };
 
+    let pendingGatePin = '';
+
     const firebaseConfig = {
       apiKey: "AIzaSyCAcUo5m9jJbEV-aka1iwXY2bYFRbduCzg",
       authDomain: "rpgplanner-31ebe.firebaseapp.com",
@@ -982,10 +984,11 @@
             };
           });
 
-          const finish = (nextMode) => {
+          const finish = (nextMode, pinVal) => {
             modal.remove();
-            if (els.passStatus) els.passStatus.textContent = maskPin(state.settings.passcode);
-            handleGate(nextMode);
+            pendingGatePin = pinVal || '';
+            if (els.passStatus && state.settings.passcode) els.passStatus.textContent = maskPin(state.settings.passcode);
+            handleGate(nextMode, pinVal);
           };
 
           const confirm = () => {
@@ -1008,18 +1011,10 @@
               }
               state.settings.passcode = current;
               saveLocal();
-              finish(mode === 'create' ? 'create' : 'check');
+              finish(mode === 'create' ? 'create' : 'check', current);
               return;
             }
-
-            if (hasPass && current !== state.settings.passcode) {
-              setHint('密码不正确', true);
-              current = '';
-              paint();
-              return;
-            }
-
-            finish('check');
+            finish('check', current);
           };
 
           modal.querySelector('#pinPromptConfirm').onclick = confirm;
@@ -1122,9 +1117,9 @@
           return cred.user;
         };
 
-        const docIdForUser = (user) => {
+        const docIdForUser = () => {
           const name = (state.settings.username || '').trim();
-          return name || user?.uid || '';
+          return name;
         };
 
         const syncCloud = async (mode = 'auto') => {
@@ -1256,7 +1251,7 @@
           save();
         };
 
-        const handleGate = async (mode = 'check') => {
+        const handleGate = async (mode = 'check', pinOverride = '') => {
           const id = (els.gateInput?.value || '').trim();
           if (!id) {
             updateCloudStatus('请先输入 ID', true);
@@ -1267,6 +1262,13 @@
           els.username.value = id;
           els.useCloud.checked = true;
           saveLocal();
+          const pin = pinOverride || pendingGatePin || (state.settings.passcode || '').trim();
+          const requirePin = mode !== 'offline';
+          if (requirePin && (!pin || pin.length !== 6)) {
+            updateCloudStatus('请先输入 6 位密码', true);
+            showGate(true);
+            return;
+          }
           updateCloudStatus('检测 ID...');
           try {
             const user = await ensureAuth();
@@ -1279,10 +1281,19 @@
               if (!shouldCreate) { updateCloudStatus('已取消，请输入其他 ID'); return; }
             }
             if (!exists) {
+              state.settings.passcode = pin;
               await docRef.set({ ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId });
               updateCloudStatus('已创建新 ID 并同步');
             } else {
               const remote = snap.data();
+              const remotePass = remote?.settings?.passcode || '';
+              if (remotePass) {
+                if (pin !== remotePass) { updateCloudStatus('密码不正确', true); return; }
+                state.settings.passcode = remotePass;
+              } else if (pin) {
+                // 填补旧数据的密码
+                state.settings.passcode = pin;
+              }
               const remoteTime = Number(remote.lastUpdated || 0);
               const localTime = Number(state.lastUpdated || 0);
               if (remoteTime > localTime) {
@@ -1311,6 +1322,9 @@
             saveLocal();
             showGate(false);
             if (els.appShell) els.appShell.classList.remove('hidden');
+            if (els.passStatus && state.settings.passcode) {
+              els.passStatus.textContent = maskPin(state.settings.passcode);
+            }
           } catch (err) {
             console.error('Gate 处理失败', err);
             updateCloudStatus(`处理失败: ${err.message}`, true);
@@ -1467,15 +1481,17 @@
         const typeFromImportance = (imp) => (imp === '低' ? 'side' : 'main');
 
         function renderTasks() {
-          const current = fmtDate(state.selectedDate);
+          const today = fmtDate(new Date());
           const importanceOrder = { '高': 0, '中': 1, '低': 2 };
-          const list = state.tasks
-            .filter(t => t.date === current)
+          const list = [...state.tasks]
             .sort((a, b) => {
+              const aToday = a.date === today ? 0 : 1;
+              const bToday = b.date === today ? 0 : 1;
+              if (aToday !== bToday) return aToday - bToday; // 今日任务优先
               const ia = importanceOrder[a.importance] ?? 1;
               const ib = importanceOrder[b.importance] ?? 1;
-              if (ia !== ib) return ia - ib;
-              if (a.date !== b.date) return a.date.localeCompare(b.date);
+              if (ia !== ib) return ia - ib; // 高优先级在前
+              if (a.date !== b.date) return a.date.localeCompare(b.date); // 其余按日期排序
               const ta = a.time || '';
               const tb = b.time || '';
               if (ta !== tb) return ta.localeCompare(tb);
