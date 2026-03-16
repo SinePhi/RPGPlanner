@@ -462,7 +462,8 @@
     @keyframes pulse { 0% { transform: scale(1); opacity:1; } 50% { transform: scale(1.05); opacity:0.6; } 100% { transform: scale(1); opacity:1; } }
     .weather-tag { margin-top:4px; font-size:11px; color: var(--muted); display:flex; align-items:center; gap:4px; }
     .weather-tag .w-icon { font-size:13px; }
-    .weather-hourly { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding:4px 0 2px; width:100%; }
+    .weather-hourly { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding:6px 8px 2px; width:100%; scroll-padding-left: 8px; }
+    .weather-hourly .hour-chip:first-child { margin-left: 2px; }
     .weather-hourly::-webkit-scrollbar { height:6px; }
     .weather-hourly::-webkit-scrollbar-thumb { background:#24222c; border-radius:999px; }
     .hour-chip { min-width:58px; padding:6px; border:1px solid #24222c; border-radius:10px; background:#0f0e15; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; box-shadow:1px 1px 0 #000; }
@@ -1192,12 +1193,11 @@
 
           // align current hour to the left on mobile/desktop
           const hourlyEl = box.querySelector('.weather-hourly');
-          if (hourlyEl && currentIdx >= 0) {
-            const chip = hourlyEl.querySelector(`[data-idx="${currentIdx}"]`);
-            if (chip) {
-              const offset = chip.offsetLeft - 6;
-              hourlyEl.scrollTo({ left: offset > 0 ? offset : 0, behavior: 'auto' });
-            }
+          if (hourlyEl) {
+            const chip = currentIdx >= 0 ? hourlyEl.querySelector(`[data-idx="${currentIdx}"]`) : null;
+            const isMobile = window.innerWidth <= 960;
+            const offset = isMobile && chip ? Math.max(0, chip.offsetLeft - 8) : 0;
+            hourlyEl.scrollTo({ left: offset, behavior: 'auto' });
           }
         };
 
@@ -3390,9 +3390,19 @@
                   );
                 });
                 const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-                els.weatherLocation.value = '当前位置';
-                await fetchWeather('', coords);
-                alert('已使用当前定位更新天气');
+                // 反向地理编码获取城市名
+                let cityName = '当前位置';
+                try {
+                  const revRes = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${coords.lat}&longitude=${coords.lon}&count=1&language=zh&format=json`);
+                  if (revRes.ok) {
+                    const rev = await revRes.json();
+                    const place = rev.results?.[0];
+                    if (place?.name) cityName = place.name;
+                  }
+                } catch (e) { /* ignore, fallback to 当前位置 */ }
+                els.weatherLocation.value = cityName;
+                await fetchWeather(cityName, coords);
+                alert(`已使用当前定位更新天气：${cityName}`);
               } catch (err) {
                 alert(`定位获取失败：${err.message}`);
               } finally {
