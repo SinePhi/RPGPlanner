@@ -597,13 +597,31 @@
       box-shadow: 2px 2px 0 #ffce00, 4px 4px 0 #000;
     }
     .mood-chip.active {
-      background: linear-gradient(180deg, #d4142a 0%, #a80d20 100%);
+      background: linear-gradient(180deg, #ffefb2 0%, #ffce00 52%, #ef9b00 100%);
       color: #111;
       border-color: #111;
-      box-shadow: 2px 2px 0 #111, 5px 5px 0 rgba(255,255,255,0.18);
+      box-shadow: 2px 2px 0 #111, 6px 6px 0 rgba(229,0,42,0.34);
       transform: none;
     }
-    .mood-chip.active::before { opacity: 0.12; }
+    .mood-chip.active::before {
+      opacity: 0.22;
+      background: linear-gradient(135deg, rgba(255,255,255,0.28), transparent 42%, rgba(0,0,0,0.12));
+    }
+    .mood-chip.active::after {
+      content: '已选中';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 2px 6px;
+      font-size: 10px;
+      line-height: 1;
+      color: #fff8ea;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      clip-path: polygon(6% 8%, 98% 2%, 94% 96%, 2% 92%);
+      box-shadow: 1px 1px 0 rgba(229,0,42,0.55);
+      z-index: 2;
+    }
     .mood-chip strong,
     .mood-chip span { position: relative; z-index: 1; display: block; }
     .mood-chip strong {
@@ -614,6 +632,10 @@
     .mood-chip span {
       font-size: 12px;
       color: rgba(0,0,0,0.74);
+    }
+    .mood-chip.active span {
+      color: rgba(0,0,0,0.82);
+      font-weight: 700;
     }
     .mood-current {
       margin-top: 14px;
@@ -842,10 +864,6 @@
       color: #f7efe0;
       box-shadow: 3px 3px 0 rgba(255,255,255,0.12), 0 0 0 1px rgba(0,0,0,0.2) inset;
     }
-    .mood-edit {
-      margin-top: 10px;
-      width: 100%;
-    }
     .mood-bars {
       display: flex;
       flex-direction: column;
@@ -1066,7 +1084,39 @@
       0% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(0); }
       100% { transform: translate(-50%, -50%) rotate(calc(var(--r) + 2deg)) translateY(-8px); }
     }
-    .close { position: absolute; top: 10px; right: 10px; background: transparent; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+    .close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal > .close {
+      position: sticky;
+      top: 6px;
+      right: auto;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 10px;
+      background: rgba(12,11,18,0.92);
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+      z-index: 30;
+      backdrop-filter: blur(6px);
+    }
+    .modal > .close:hover {
+      border-color: #ffce00;
+      color: #ffce00;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.38);
+    }
     .lock-modal { max-width: 360px; text-align: center; padding-top: 22px; }
     .lock-modal h3 { margin-bottom: 12px; text-align: left; }
 
@@ -1187,8 +1237,8 @@
     .pill-toggle .pill-btn.active {
       border-color: #111;
       color:#111 !important;
-      background: linear-gradient(180deg, #d4142a 0%, #a80d20 100%);
-      box-shadow:2px 2px 0 #111, 6px 6px 0 rgba(255,255,255,0.18);
+      background: linear-gradient(180deg, #fff4bc 0%, #ffce00 55%, #f09f00 100%);
+      box-shadow:2px 2px 0 #111, 6px 6px 0 rgba(229,0,42,0.34);
       transform: none;
     }
     .pill-toggle .pill-btn.active:hover {
@@ -1198,10 +1248,27 @@
       transform: none;
     }
     .pill-toggle .pill-btn.active::before {
-      opacity:0.14;
+      opacity:0.2;
       inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent 46%, rgba(0,0,0,0.08));
+      background: linear-gradient(135deg, rgba(255,255,255,0.24), transparent 46%, rgba(0,0,0,0.08));
       animation: none;
+    }
+    .pill-toggle .pill-btn.active::after {
+      display: block;
+      content: '当前';
+      position: absolute;
+      top: -8px;
+      right: -6px;
+      padding: 2px 6px;
+      border: 1px solid #111;
+      background: #111;
+      color: #fff5e6;
+      font-size: 10px;
+      line-height: 1;
+      letter-spacing: 0.3px;
+      clip-path: polygon(6% 8%, 98% 2%, 94% 96%, 2% 92%);
+      box-shadow: 1px 1px 0 rgba(229,0,42,0.52);
+      z-index: 3;
     }
     .pill-toggle .pill-btn span { position:relative; z-index:2; }
 
@@ -1652,7 +1719,7 @@
   <div id="appShell" class="hidden">
     <button class="ghost-btn" id="calendarToggle">☰ 日历</button>
     <button class="ghost-btn" id="settingsToggle">⚙ 设置</button>
-    <button class="fab" id="quickBtn" title="闪投">⚡</button>
+    <button class="fab" id="quickBtn" title="闪投任务">☑</button>
     <header>
       <div class="hero">
         <div class="hero-head">
@@ -1857,11 +1924,14 @@
     ];
 
     const labelTargets = {};
+    const radarPointTargets = {};
     let weatherTick = null;
     let lastSelectedDayEl = null;
     let lastWeatherRenderKey = '';
     let lastStatsKey = '';
     let lastTasksKey = '';
+    let cloudUnsubscribe = null;
+    let hasPendingCloudSave = false;
 
         const LEVEL_THRESHOLDS = [0, 30, 80, 150, 240, 360];
         const weekdays = ['日','一','二','三','四','五','六'];
@@ -1996,8 +2066,52 @@
           bar.classList.add('flash');
         };
 
+        const computeRadarTargets = () => {
+          const canvas = els.radarCanvas;
+          if (!canvas) return {};
+          const width = canvas.clientWidth;
+          const height = canvas.clientHeight;
+          if (!width || !height) return {};
+
+          const cx = width / 2;
+          const cy = height / 2 + 10;
+          const radius = Math.min(width, height) * 0.32;
+          const tilt = { rot: -0.22, sx: 1.08, sy: 0.8 };
+          const maxVal = 5;
+          const rect = canvas.getBoundingClientRect();
+
+          const transformPoint = (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const rdx = dx * Math.cos(tilt.rot) - dy * Math.sin(tilt.rot);
+            const rdy = dx * Math.sin(tilt.rot) + dy * Math.cos(tilt.rot);
+            return [cx + rdx * tilt.sx, cy + rdy * tilt.sy];
+          };
+
+          return DIMENSIONS.reduce((acc, dim, idx) => {
+            const angle = (Math.PI * 2 * idx / DIMENSIONS.length) - Math.PI / 2;
+            const labelBaseX = cx + (radius + 24) * Math.cos(angle);
+            const labelBaseY = cy + (radius + 24) * Math.sin(angle);
+            const [labelX, labelY] = transformPoint(labelBaseX, labelBaseY);
+
+            const val = levelFor(Math.max(0, state.stats[dim.key] || 0));
+            const factor = val / maxVal;
+            const pointRadius = radius * factor;
+            const [pointX, pointY] = transformPoint(
+              cx + pointRadius * Math.cos(angle),
+              cy + pointRadius * Math.sin(angle)
+            );
+
+            acc[dim.key] = {
+              label: { x: rect.left + labelX, y: rect.top + labelY },
+              point: { x: rect.left + pointX, y: rect.top + pointY },
+            };
+            return acc;
+          }, {});
+        };
+
         const triggerLabelPulse = (dimKey) => {
-          const target = labelTargets[dimKey];
+          const target = radarPointTargets[dimKey] || labelTargets[dimKey];
           if (!target) return;
           const pulse = document.createElement('div');
           pulse.className = 'label-pulse';
@@ -2012,9 +2126,10 @@
           const heroRect = els.hero?.getBoundingClientRect();
           const startX = heroRect ? heroRect.left + heroRect.width * 0.5 : window.innerWidth * 0.5;
           const startY = heroRect ? heroRect.top + heroRect.height * 0.25 : window.innerHeight * 0.25;
+          const radarTargets = computeRadarTargets();
           Object.entries(gains).forEach(([key, val]) => {
             if (!val) return;
-            const target = labelTargets[key];
+            const target = radarTargets[key]?.point || radarPointTargets[key] || labelTargets[key];
             const label = DIMENSIONS.find(d => d.key === key)?.label || key;
             const node = document.createElement('div');
             node.className = 'gain-fly';
@@ -2467,6 +2582,13 @@
           return new Date(y, m - 1, d);
         }
 
+        function maskPin(pin) {
+          const digits = String(pin || '').trim();
+          if (!digits) return '未设置';
+          if (digits.length <= 2) return '•'.repeat(digits.length);
+          return `${'•'.repeat(Math.max(0, digits.length - 2))}${digits.slice(-2)}`;
+        }
+
         function levelFor(xp) {
           let lvl = 0;
           for (let i = 0; i < LEVEL_THRESHOLDS.length; i++) {
@@ -2517,7 +2639,7 @@
           }
         }
         function saveLocal() {
-          const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId };
+          const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Number(state.lastUpdated || Date.now()), clientId };
           state.lastUpdated = payload.lastUpdated;
           localStorage.setItem('persona-planner', JSON.stringify(payload));
         }
@@ -2558,6 +2680,51 @@
         const docIdForUser = () => {
           const name = (state.settings.username || '').trim();
           return name;
+        };
+
+        const stopCloudSubscription = () => {
+          if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe();
+          cloudUnsubscribe = null;
+        };
+
+        const applyRemoteSnapshot = (remote, source = '云端') => {
+          const merged = mergeRemote(remote);
+          if (!merged) return false;
+          renderStats();
+          renderCalendar();
+          renderTasks();
+          saveLocal();
+          if (els.appShell) els.appShell.classList.remove('hidden');
+          updateCloudStatus(`${source}数据已同步到当前设备`);
+          return true;
+        };
+
+        const startCloudSubscription = async () => {
+          if (!state.settings.useCloud) {
+            stopCloudSubscription();
+            return;
+          }
+          const id = docIdForUser();
+          if (!id) return;
+          await ensureAuth();
+          const { db } = await ensureFirebase();
+          const docRef = db.collection('users').doc(id);
+          stopCloudSubscription();
+          cloudUnsubscribe = docRef.onSnapshot((snap) => {
+            if (!snap.exists) return;
+            const remote = snap.data() || null;
+            const remoteTime = Number(remote?.lastUpdated || 0);
+            const localTime = Number(state.lastUpdated || 0);
+            if (!remoteTime || remote?.clientId === clientId || remoteTime <= localTime) return;
+            if (hasPendingCloudSave) {
+              updateCloudStatus('另一台设备有新数据，但当前设备也有未上传改动，请点“连接 / 手动同步”确认');
+              return;
+            }
+            applyRemoteSnapshot(remote, '已自动接收另一台设备的');
+          }, (err) => {
+            console.error('云端监听失败', err);
+            updateCloudStatus(`云监听失败: ${err.message}`, true);
+          });
         };
 
         const syncCloud = async (mode = 'auto') => {
@@ -2612,7 +2779,10 @@
         };
 
         const saveRemote = async () => {
-          if (!state.settings.useCloud) return;
+          if (!state.settings.useCloud) {
+            hasPendingCloudSave = false;
+            return;
+          }
           try {
             const user = await ensureAuth();
             const id = docIdForUser(user);
@@ -2624,17 +2794,19 @@
             const docRef = db.collection('users').doc(id);
             const snap = await docRef.get();
             const remoteTime = Number(snap.data()?.lastUpdated || 0);
-            const localTime = Number(state.lastUpdated || 0);
+            const localTime = Number(state.lastUpdated || Date.now());
             if (remoteTime && remoteTime > localTime) {
               const proceed = confirm('云端有更新，是否覆盖云端为当前本地数据？建议先“连接 / 手动同步”以拉取最新。');
               if (!proceed) {
+                hasPendingCloudSave = false;
                 updateCloudStatus('已取消上传，保留云端较新数据');
                 return;
               }
             }
-            const payload = { ...state, settings: stripWeather(state.settings), selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Date.now(), clientId };
+            const payload = { ...state, settings: stripWeather(state.settings), selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: localTime, clientId };
             await docRef.set(payload, { merge: true });
             state.lastUpdated = payload.lastUpdated;
+            hasPendingCloudSave = false;
             updateCloudStatus('已同步至云端');
           } catch (err) {
             console.error('保存到云端失败', err);
@@ -2664,6 +2836,7 @@
           if (!state.settings.useCloud) return;
           try {
             await syncCloud('auto');
+            await startCloudSubscription();
             renderStats();
             renderCalendar();
             renderTasks();
@@ -2765,6 +2938,7 @@
             renderCalendar();
             renderTasks();
             saveLocal();
+            await startCloudSubscription();
             showGate(false);
             if (els.appShell) els.appShell.classList.remove('hidden');
             if (els.passStatus && state.settings.passcode) {
@@ -2777,6 +2951,8 @@
         };
 
         function save() {
+          state.lastUpdated = Date.now();
+          hasPendingCloudSave = !!state.settings.useCloud;
           saveLocalDebounced();
           if (state.settings.useCloud) saveRemoteDebounced();
         }
@@ -2926,6 +3102,12 @@
           save();
         }
 
+        async function persistTodayMoodImmediately() {
+          saveLocal();
+          if (!state.settings.useCloud) return;
+          await saveRemote();
+        }
+
         function collectTodayMoodEntries(moods = []) {
           const todayIso = fmtDate(new Date());
           return (moods || []).filter(item => item && item.date === todayIso && item.mood);
@@ -2954,7 +3136,7 @@
             const user = await ensureAuth();
             if (!user) return { entries: localEntries, source: 'local', ownEntry: getTodayMoodEntry(state.moods) };
             const { db } = await ensureFirebase();
-            const snap = await db.collection('users').get();
+            const snap = await db.collection('users').get({ source: 'server' });
             const entries = [];
             let ownEntry = null;
             snap.forEach(doc => {
@@ -3428,6 +3610,7 @@
           saveMoodBtn.onclick = async () => {
             upsertTodayMood(selectedMood);
             try {
+              await persistTodayMoodImmediately();
               const [moodResult, pointResult] = await Promise.all([
                 fetchAllUsersTodayMoodEntries(),
                 fetchAllUsersTodayPointGroups(),
@@ -3606,9 +3789,11 @@
             ctx.fillText(dim.label, 0, 0);
             ctx.restore();
 
-            // store screen coords for fly-to animation
-            const rect = canvas.getBoundingClientRect();
-            labelTargets[dim.key] = { x: rect.left + tx, y: rect.top + ty };
+            const targets = computeRadarTargets()[dim.key];
+            if (targets) {
+              labelTargets[dim.key] = targets.label;
+              radarPointTargets[dim.key] = targets.point;
+            }
           });
         }
 
@@ -5113,8 +5298,15 @@
           els.useCloud.onchange = () => {
             state.settings.useCloud = els.useCloud.checked;
             save();
-            if (state.settings.useCloud) syncCloud('auto');
-            else updateCloudStatus('已关闭云同步，仅本地保存');
+            if (state.settings.useCloud) {
+              syncCloud('auto').then(() => startCloudSubscription()).catch(err => {
+                console.error('启用云同步失败', err);
+                updateCloudStatus(`云同步失败: ${err.message}`, true);
+              });
+            } else {
+              stopCloudSubscription();
+              updateCloudStatus('已关闭云同步，仅本地保存');
+            }
           };
 
           if (els.exportIcs) {
@@ -5267,6 +5459,8 @@
             state.settings.username = '';
             state.settings.useCloud = false;
             state.userId = '';
+            hasPendingCloudSave = false;
+            stopCloudSubscription();
             if (els.username) els.username.value = '';
             if (els.useCloud) els.useCloud.checked = false;
             try {
@@ -5383,6 +5577,12 @@
           // 每 5 分钟刷新一次天气展示的时间标注（不重新拉接口）
           if (weatherTick) clearInterval(weatherTick);
           weatherTick = setInterval(() => renderWeatherNow(), 5 * 60 * 1000);
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && state.settings.useCloud) loadRemote();
+          });
+          window.addEventListener('focus', () => {
+            if (state.settings.useCloud) loadRemote();
+          });
           window.addEventListener('beforeunload', saveLocal);
         }
 
