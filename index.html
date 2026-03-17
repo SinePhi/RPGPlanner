@@ -597,30 +597,15 @@
       box-shadow: 2px 2px 0 #ffce00, 4px 4px 0 #000;
     }
     .mood-chip.active {
-      background: linear-gradient(180deg, #ffefb2 0%, #ffce00 52%, #ef9b00 100%);
-      color: #111;
-      border-color: #111;
-      box-shadow: 2px 2px 0 #111, 6px 6px 0 rgba(229,0,42,0.34);
+      background: linear-gradient(180deg, #f6f1e7 0%, #ddd5c7 100%);
+      color: #b00020;
+      border-color: #b00020;
+      box-shadow: 2px 2px 0 #000, 4px 4px 0 rgba(176,0,32,0.26);
       transform: none;
     }
     .mood-chip.active::before {
-      opacity: 0.22;
-      background: linear-gradient(135deg, rgba(255,255,255,0.28), transparent 42%, rgba(0,0,0,0.12));
-    }
-    .mood-chip.active::after {
-      content: '已选中';
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      padding: 2px 6px;
-      font-size: 10px;
-      line-height: 1;
-      color: #fff8ea;
-      background: #111;
-      border: 1px solid rgba(255,255,255,0.2);
-      clip-path: polygon(6% 8%, 98% 2%, 94% 96%, 2% 92%);
-      box-shadow: 1px 1px 0 rgba(229,0,42,0.55);
-      z-index: 2;
+      opacity: 0.12;
+      background: linear-gradient(135deg, rgba(255,255,255,0.14), transparent 42%, rgba(0,0,0,0.12));
     }
     .mood-chip strong,
     .mood-chip span { position: relative; z-index: 1; display: block; }
@@ -633,10 +618,7 @@
       font-size: 12px;
       color: rgba(0,0,0,0.74);
     }
-    .mood-chip.active span {
-      color: rgba(0,0,0,0.82);
-      font-weight: 700;
-    }
+    .mood-chip.active span { color: rgba(176,0,32,0.78); font-weight: 700; }
     .mood-current {
       margin-top: 14px;
       font-size: 13px;
@@ -1235,40 +1217,23 @@
       100% { transform: rotate(360deg); }
     }
     .pill-toggle .pill-btn.active {
-      border-color: #111;
-      color:#111 !important;
-      background: linear-gradient(180deg, #fff4bc 0%, #ffce00 55%, #f09f00 100%);
-      box-shadow:2px 2px 0 #111, 6px 6px 0 rgba(229,0,42,0.34);
+      border-color: #b00020;
+      color:#b00020 !important;
+      background:#0f0e15;
+      box-shadow:2px 2px 0 #000, 4px 4px 0 rgba(176,0,32,0.26);
       transform: none;
     }
     .pill-toggle .pill-btn.active:hover {
-      border-color: #111;
-      color: #111 !important;
-      box-shadow: 2px 2px 0 #111, 6px 6px 0 rgba(255,255,255,0.18);
+      border-color: #b00020;
+      color: #b00020 !important;
+      box-shadow: 2px 2px 0 #000, 4px 4px 0 rgba(176,0,32,0.26);
       transform: none;
     }
     .pill-toggle .pill-btn.active::before {
-      opacity:0.2;
+      opacity:0.08;
       inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.24), transparent 46%, rgba(0,0,0,0.08));
+      background: linear-gradient(135deg, rgba(255,255,255,0.14), transparent 46%, rgba(0,0,0,0.08));
       animation: none;
-    }
-    .pill-toggle .pill-btn.active::after {
-      display: block;
-      content: '当前';
-      position: absolute;
-      top: -8px;
-      right: -6px;
-      padding: 2px 6px;
-      border: 1px solid #111;
-      background: #111;
-      color: #fff5e6;
-      font-size: 10px;
-      line-height: 1;
-      letter-spacing: 0.3px;
-      clip-path: polygon(6% 8%, 98% 2%, 94% 96%, 2% 92%);
-      box-shadow: 1px 1px 0 rgba(229,0,42,0.52);
-      z-index: 3;
     }
     .pill-toggle .pill-btn span { position:relative; z-index:2; }
 
@@ -1383,11 +1348,20 @@
     .weather-hourly .hour-chip:first-child { margin-left: 2px; }
     .weather-hourly::-webkit-scrollbar { height:8px; background:#0b0a11; }
     .weather-hourly::-webkit-scrollbar-thumb { background:#b00020; border-radius:999px; border:1px solid #000; }
-    .hour-chip { min-width:58px; padding:6px; border:1px solid #24222c; border-radius:10px; background:#0f0e15; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; box-shadow:1px 1px 0 #000; }
+    .hour-chip { min-width:58px; padding:6px; border:1px solid #24222c; border-radius:10px; background:#0f0e15; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; box-shadow:1px 1px 0 #000; transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease; }
     .hour-chip .h-temp { font-weight:700; }
     .hour-chip .h-time { color: var(--muted); font-size:11px; }
-    .hour-chip.current { border-color: #ffce00; box-shadow: 0 0 10px rgba(255,206,0,0.6); }
-    .hour-chip .h-now { color:#ffce00; font-size:11px; font-weight:800; letter-spacing:0.3px; }
+    .hour-chip.current {
+      border-color: #b00020;
+      background: linear-gradient(180deg, rgba(176,0,32,0.18) 0%, rgba(176,0,32,0.08) 100%), #141218;
+      box-shadow: 0 0 0 1px rgba(176,0,32,0.34) inset, 0 0 14px rgba(176,0,32,0.34), 2px 2px 0 #000;
+      transform: translateY(-1px);
+    }
+    .hour-chip.current .h-time,
+    .hour-chip.current .h-temp {
+      color: #ffb7c2;
+    }
+    .hour-chip .h-now { color:#e5002a; font-size:11px; font-weight:800; letter-spacing:0.3px; }
 
     .gain-fly {
       position: fixed;
@@ -2262,6 +2236,29 @@
           renderWeatherParticles(weatherBox, fxClass.replace('weather-', ''));
         };
 
+        const parseWeatherHourValue = (entry) => {
+          if (!entry) return NaN;
+          if (Number.isFinite(Number(entry.hour))) return Number(entry.hour);
+          if (typeof entry.hour === 'string') {
+            const hourMatch = entry.hour.match(/(\d{1,2})/);
+            if (hourMatch) return Number(hourMatch[1]);
+          }
+          if (typeof entry.time === 'string') {
+            const timePart = entry.time.slice(11, 13);
+            if (timePart) return Number(timePart);
+          }
+          return NaN;
+        };
+
+        const findCurrentWeatherHourIndex = (hourly = [], currentHour = 0) => {
+          if (!Array.isArray(hourly) || !hourly.length) return -1;
+          const exactIndex = hourly.findIndex(h => parseWeatherHourValue(h) === currentHour);
+          if (exactIndex >= 0) return exactIndex;
+          const upcomingIndex = hourly.findIndex(h => parseWeatherHourValue(h) >= currentHour);
+          if (upcomingIndex >= 0) return upcomingIndex;
+          return hourly.length - 1;
+        };
+
         const renderWeatherNow = () => {
           const box = els.weatherNow;
           if (!box) return;
@@ -2283,9 +2280,10 @@
           const now = new Date();
           const isToday = fmtDate(now) === selectedIso;
           const currentHour = now.getHours();
-          const startIdx = isToday ? Math.max(0, hourly.findIndex(h => Number(h.hour) >= currentHour)) : 0;
+          const currentHourIndex = isToday ? findCurrentWeatherHourIndex(hourly, currentHour) : -1;
+          const startIdx = isToday && currentHourIndex >= 0 ? currentHourIndex : 0;
           const hourlyDisplay = hourly.slice(startIdx); // show current and all upcoming hours
-          const currentHourEntry = isToday ? hourly.find(h => Number(h.hour) === currentHour) : null;
+          const currentHourEntry = isToday && currentHourIndex >= 0 ? hourly[currentHourIndex] : null;
           const renderKey = `${selectedIso}-${city}-${hourlyDisplay.length}-${isToday ? currentHour : 'na'}-${forecast.code}-${forecast.min}-${forecast.max}-${currentHourEntry?.code ?? 'na'}-${currentHourEntry?.temp ?? 'na'}`;
           if (renderKey === lastWeatherRenderKey) {
             return;
@@ -2305,10 +2303,14 @@
           const hourlyHtml = hourlyDisplay.length
             ? `<div class="weather-hourly">${hourlyDisplay.map((h, idx) => {
                 const hi = weatherInfo(h.code);
-                const tag = `${h.hour || '--'}时`;
+                const hourValue = parseWeatherHourValue(h);
+                const tag = `${Number.isFinite(hourValue) ? String(hourValue).padStart(2, '0') : (h.hour || '--')}时`;
                 const hTemp = h.temp != null ? `${Math.round(h.temp)}°` : '--';
-                const isNow = isToday && Number(h.hour) === currentHour;
-                return `<div class="hour-chip${isNow ? ' current' : ''}" data-idx="${idx}"><span class="h-time">${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp">${hTemp}</span>${isNow ? '<span class="h-now">现在</span>' : ''}</div>`;
+                const isNow = isToday && idx === 0;
+                const currentStyle = isNow ? ' style="border-color:#b00020;background:linear-gradient(180deg, rgba(176,0,32,0.2) 0%, rgba(176,0,32,0.08) 100%), #141218;box-shadow:0 0 0 1px rgba(176,0,32,0.34) inset, 0 0 14px rgba(176,0,32,0.32), 2px 2px 0 #000;transform:translateY(-1px);"' : '';
+                const timeStyle = isNow ? ' style="color:#ffb7c2;"' : '';
+                const tempStyle = isNow ? ' style="color:#ffb7c2;"' : '';
+                return `<div class="hour-chip${isNow ? ' current' : ''}" data-idx="${idx}"${currentStyle}><span class="h-time"${timeStyle}>${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp"${tempStyle}>${hTemp}</span>${isNow ? '<span class="h-now">现在</span>' : ''}</div>`;
               }).join('')}</div>`
             : `<div class="weather-hourly" style="opacity:0.7;">无小时预报</div>`;
 
