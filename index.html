@@ -2931,22 +2931,42 @@
           return (moods || []).filter(item => item && item.date === todayIso && item.mood);
         }
 
+        function syncTodayMoodToLocal(entry) {
+          if (!entry || !entry.mood) return false;
+          const todayIso = fmtDate(new Date());
+          if (entry.date !== todayIso) return false;
+          const localEntry = getTodayMoodEntry(state.moods);
+          const remoteTime = Number(entry.createdAt || 0);
+          const localTime = Number(localEntry?.createdAt || 0);
+          if (localEntry && localTime >= remoteTime) return false;
+          const idx = state.moods.findIndex(item => item?.date === todayIso);
+          const normalized = { date: todayIso, mood: entry.mood, createdAt: remoteTime || Date.now() };
+          if (idx >= 0) state.moods[idx] = { ...state.moods[idx], ...normalized };
+          else state.moods.push(normalized);
+          saveLocal();
+          return true;
+        }
+
         async function fetchAllUsersTodayMoodEntries() {
           const localEntries = collectTodayMoodEntries(state.moods);
+          const ownId = (state.settings.username || '').trim();
           try {
             const user = await ensureAuth();
-            if (!user) return { entries: localEntries, source: 'local' };
+            if (!user) return { entries: localEntries, source: 'local', ownEntry: getTodayMoodEntry(state.moods) };
             const { db } = await ensureFirebase();
             const snap = await db.collection('users').get();
             const entries = [];
+            let ownEntry = null;
             snap.forEach(doc => {
               const remote = doc.data() || {};
               const entry = getTodayMoodEntry(Array.isArray(remote.moods) ? remote.moods : []);
-              if (entry) entries.push(entry);
+              if (!entry) return;
+              entries.push(entry);
+              if (ownId && doc.id === ownId) ownEntry = entry;
             });
-            return { entries, source: 'cloud' };
+            return { entries, source: 'cloud', ownEntry };
           } catch (err) {
-            return { entries: localEntries, source: 'local' };
+            return { entries: localEntries, source: 'local', ownEntry: getTodayMoodEntry(state.moods) };
           }
         }
 
@@ -3372,6 +3392,10 @@
               const currentMood = MOOD_OPTIONS.find(item => item.key === savedMood.mood);
               currentEl.textContent = currentMood ? `你今天是 ${currentMood.icon} ${currentMood.label}` : '你今天已经记录了状态';
               renderMoodPosterCloud(cloudEl, aggregate.items);
+            } else {
+              stopCloudPhysics(cloudEl);
+              cloudEl.classList.add('empty');
+              cloudEl.innerHTML = '';
             }
             const sourceLabel = moodSource === 'cloud' ? '云端所有用户' : '当前设备数据';
             statusEl.textContent = `${sourceLabel} · 今天共有 ${aggregate.total} 份心情记录`;
@@ -3408,6 +3432,9 @@
                 fetchAllUsersTodayMoodEntries(),
                 fetchAllUsersTodayPointGroups(),
               ]);
+              if (syncTodayMoodToLocal(moodResult.ownEntry)) {
+                selectedMood = getTodayMoodEntry(state.moods)?.mood || selectedMood;
+              }
               moodDataset = moodResult.entries || [];
               pointDataset = pointResult.groups || [];
               moodSource = moodResult.source || 'local';
@@ -3432,6 +3459,9 @@
                 fetchAllUsersTodayMoodEntries(),
                 fetchAllUsersTodayPointGroups(),
               ]);
+              if (syncTodayMoodToLocal(moodResult.ownEntry)) {
+                selectedMood = getTodayMoodEntry(state.moods)?.mood || selectedMood;
+              }
               moodDataset = moodResult.entries || [];
               pointDataset = pointResult.groups || [];
               moodSource = moodResult.source || 'local';
