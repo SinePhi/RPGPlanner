@@ -1581,6 +1581,59 @@
       filter: drop-shadow(0 2px 0 rgba(0,0,0,0.18));
     }
     .fab:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(0,0,0,0.55), 0 12px 26px rgba(176,0,32,0.55); filter: brightness(1.05); }
+    .today-fab {
+      --return-today-offset-y: 0px;
+      position: fixed;
+      left: 50% !important;
+      right: auto !important;
+      top: 0 !important;
+      bottom: auto !important;
+      transform: translateX(-50%) translateY(var(--return-today-offset-y));
+      min-width: min(320px, calc(100vw - 110px));
+      max-width: calc(100vw - 110px);
+      padding: 11px 18px 10px;
+      border: 1px solid #111;
+      background: linear-gradient(180deg, #f6f1e7 0%, #ddd5c7 100%);
+      color: #111;
+      cursor: pointer;
+      z-index: 16;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+      clip-path: polygon(4% 6%, 98% 2%, 95% 96%, 2% 92%);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.42), 0 8px 14px rgba(255,255,255,0.08);
+      overflow: hidden;
+      isolation: isolate;
+      font-family: 'Bebas Neue', 'Times New Roman', 'Space Grotesk', sans-serif;
+      letter-spacing: 0.5px;
+      font-size: 18px;
+      line-height: 1;
+      text-align: center;
+    }
+    .today-fab:hover {
+      border-color: #ffce00;
+      transform: translateX(-50%) translateY(calc(var(--return-today-offset-y) - 2px));
+      box-shadow: 0 14px 28px rgba(0,0,0,0.48), 0 8px 16px rgba(255,206,0,0.18);
+      filter: brightness(1.05);
+    }
+    .today-fab.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(calc(var(--return-today-offset-y) - 10px));
+    }
+    .today-fab::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.18), transparent 46%, rgba(0,0,0,0.08));
+      mix-blend-mode: multiply;
+      pointer-events: none;
+    }
+    .today-fab span {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
 
     .ghost-btn {
       position: fixed;
@@ -1669,6 +1722,17 @@
       .w-nowchip { max-width: 100%; white-space: normal; }
       .fab { width: 52px; height: 52px; font-size: 20px; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
       .fab .fab-icon { width: 30px; height: 30px; }
+      .today-fab {
+        left: 50% !important;
+        right: auto !important;
+        top: 0 !important;
+        bottom: auto !important;
+        transform: translateX(-50%) translateY(var(--return-today-offset-y));
+        min-width: min(280px, calc(100vw - 36px));
+        max-width: calc(100vw - 36px);
+        font-size: 15px;
+        padding: 9px 12px 8px;
+      }
       .ghost-btn { padding: 6px 10px; font-size: 13px; top: calc(12px + env(safe-area-inset-top, 0px)); }
       .drawer { right: calc(10px + env(safe-area-inset-right, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); width: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); max-height: 82vh; }
       .drawer-left { left: calc(10px + env(safe-area-inset-left, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); width: auto; top: calc(64px + env(safe-area-inset-top, 0px)); }
@@ -1702,6 +1766,7 @@
   <div id="appShell" class="hidden">
     <button class="ghost-btn" id="calendarToggle">☰ 日历</button>
     <button class="ghost-btn" id="settingsToggle">⚙ 设置</button>
+    <button class="today-fab hidden" id="returnTodayBtn" title="返回今天" aria-label="返回今天"><span>↺ 今天</span></button>
     <button class="fab" id="quickBtn" title="闪投任务" aria-label="闪投任务">
       <svg class="fab-icon" viewBox="0 0 64 64" aria-hidden="true">
         <rect x="16" y="12" width="32" height="42" rx="4" fill="#fff5cc" stroke="#6f3f22" stroke-width="3"></rect>
@@ -1883,6 +1948,8 @@
         weatherLocation: '',
         weatherLat: null,
         weatherLon: null,
+        weatherTimezone: '',
+        weatherTimezoneLabel: '',
         weatherForecast: [],
         weatherHourly: [],
       },
@@ -1922,6 +1989,9 @@
     let lastTasksKey = '';
     let cloudUnsubscribe = null;
     let hasPendingCloudSave = false;
+    const overlayHistoryStack = [];
+    let overlayHistorySeq = 0;
+    let suppressNextOverlayPop = 0;
 
         const LEVEL_THRESHOLDS = [0, 30, 80, 150, 240, 360];
         const weekdays = ['日','一','二','三','四','五','六'];
@@ -1982,6 +2052,7 @@
           refreshWeather: document.getElementById('refreshWeather'),
           locateWeather: document.getElementById('locateWeather'),
           weatherNow: document.getElementById('weatherNow'),
+          returnTodayBtn: document.getElementById('returnTodayBtn'),
           exportIcs: document.getElementById('exportIcs'),
           importIcs: document.getElementById('importIcs'),
           importIcsInput: document.getElementById('importIcsInput'),
@@ -2262,14 +2333,16 @@
         const renderWeatherNow = () => {
           const box = els.weatherNow;
           if (!box) return;
-          const selectedIso = fmtDate(state.selectedDate || new Date());
+          const weatherClock = getWeatherClock();
+          const selectedIso = fmtDate(state.selectedDate || getAppNow());
           const forecastList = state.settings.weatherForecast || [];
           const hourlyList = state.settings.weatherHourly || [];
           const forecast = forecastList.find(d => d.date === selectedIso);
           const city = state.settings.weatherLocation || '未知';
+          const zoneLabel = state.settings.weatherTimezoneLabel || state.settings.weatherTimezone || '';
 
           if (!forecast) {
-            box.innerHTML = `<span class="w-icon">ℹ️</span><div style="display:flex; flex-direction:column; gap:2px;"><span class="w-temp">无预报</span><span class="w-city">${city} · 仅覆盖未来 3 天</span></div>`;
+            box.innerHTML = `<span class="w-icon">ℹ️</span><div style="display:flex; flex-direction:column; gap:2px;"><span class="w-temp">无预报</span><span class="w-city">${city}${zoneLabel ? ` · ${zoneLabel}` : ''} · 仅覆盖未来 3 天</span></div>`;
             box.style.display = 'flex';
             lastWeatherRenderKey = `none-${selectedIso}-${city}`;
             applyWeatherFx(null);
@@ -2277,19 +2350,18 @@
           }
 
           const hourly = hourlyList.filter(h => h.date === selectedIso).slice(0, 24);
-          const now = new Date();
-          const isToday = fmtDate(now) === selectedIso;
-          const currentHour = now.getHours();
-          const currentHourIndex = isToday ? findCurrentWeatherHourIndex(hourly, currentHour) : -1;
-          const startIdx = isToday && currentHourIndex >= 0 ? currentHourIndex : 0;
+          const isWeatherToday = selectedIso === weatherClock.date;
+          const currentHour = weatherClock.hour;
+          const currentHourIndex = isWeatherToday ? findCurrentWeatherHourIndex(hourly, currentHour) : -1;
+          const startIdx = currentHourIndex >= 0 ? currentHourIndex : 0;
           const hourlyDisplay = hourly.slice(startIdx); // show current and all upcoming hours
-          const currentHourEntry = isToday && currentHourIndex >= 0 ? hourly[currentHourIndex] : null;
-          const renderKey = `${selectedIso}-${city}-${hourlyDisplay.length}-${isToday ? currentHour : 'na'}-${forecast.code}-${forecast.min}-${forecast.max}-${currentHourEntry?.code ?? 'na'}-${currentHourEntry?.temp ?? 'na'}`;
+          const currentHourEntry = currentHourIndex >= 0 ? hourly[currentHourIndex] : null;
+          const renderKey = `${selectedIso}-${city}-${weatherClock.timeZone}-${hourlyDisplay.length}-${currentHour}-${forecast.code}-${forecast.min}-${forecast.max}-${currentHourEntry?.code ?? 'na'}-${currentHourEntry?.temp ?? 'na'}`;
           if (renderKey === lastWeatherRenderKey) {
             return;
           }
 
-          const info = weatherInfo(forecast.code);
+          const info = weatherInfo(currentHourEntry?.code ?? forecast.code);
           const temp = `${Math.round(forecast.min)}°/${Math.round(forecast.max)}°`;
           const alert = info.extreme ? `<span class="weather-alert">⚠ ${info.label}</span>` : '';
           const weekdayLabel = weekdays[parseDate(selectedIso).getDay()];
@@ -2298,7 +2370,7 @@
             forecast.precip != null ? `降水 ${Math.round(forecast.precip)}%` : '',
             forecast.wind != null ? `风速 ${Math.round(forecast.wind)} km/h` : '',
           ].filter(Boolean).join(' · ');
-          const nowChip = currentHourEntry ? `<span class="w-nowchip">现在 ${currentHourEntry.hour || '--'}时 · ${currentHourEntry.temp != null ? `${Math.round(currentHourEntry.temp)}°` : '--'} · ${weatherInfo(currentHourEntry.code).label}</span>` : '';
+          const nowChip = currentHourEntry ? `<span class="w-nowchip">当地现在 ${String(currentHour).padStart(2, '0')}时 · ${currentHourEntry.temp != null ? `${Math.round(currentHourEntry.temp)}°` : '--'} · ${weatherInfo(currentHourEntry.code).label}</span>` : '';
 
           const hourlyHtml = hourlyDisplay.length
             ? `<div class="weather-hourly">${hourlyDisplay.map((h, idx) => {
@@ -2306,7 +2378,7 @@
                 const hourValue = parseWeatherHourValue(h);
                 const tag = `${Number.isFinite(hourValue) ? String(hourValue).padStart(2, '0') : (h.hour || '--')}时`;
                 const hTemp = h.temp != null ? `${Math.round(h.temp)}°` : '--';
-                const isNow = isToday && idx === 0;
+                const isNow = isWeatherToday && idx === 0;
                 const currentStyle = isNow ? ' style="border-color:#b00020;background:linear-gradient(180deg, rgba(176,0,32,0.2) 0%, rgba(176,0,32,0.08) 100%), #141218;box-shadow:0 0 0 1px rgba(176,0,32,0.34) inset, 0 0 14px rgba(176,0,32,0.32), 2px 2px 0 #000;transform:translateY(-1px);"' : '';
                 const timeStyle = isNow ? ' style="color:#ffb7c2;"' : '';
                 const tempStyle = isNow ? ' style="color:#ffb7c2;"' : '';
@@ -2314,7 +2386,7 @@
               }).join('')}</div>`
             : `<div class="weather-hourly" style="opacity:0.7;">无小时预报</div>`;
 
-          box.innerHTML = `${alert}<span class="w-icon">${info.icon}</span><div style="display:flex; flex-direction:column; gap:2px; min-width:140px;"><span class="w-temp">${temp}</span><span class="w-desc">${detailParts}</span>${nowChip}</div><span class="w-city">${city} · ${selectedIso} 周${weekdayLabel}</span>${hourlyHtml}`;
+          box.innerHTML = `${alert}<span class="w-icon">${info.icon}</span><div style="display:flex; flex-direction:column; gap:2px; min-width:140px;"><span class="w-temp">${temp}</span><span class="w-desc">${detailParts}</span>${nowChip}</div><span class="w-city">${city} · ${selectedIso} 周${weekdayLabel}${zoneLabel ? ` · ${zoneLabel}` : ''}</span>${hourlyHtml}`;
           box.style.display = 'flex';
           applyWeatherFx(info);
           lastWeatherRenderKey = renderKey;
@@ -2328,9 +2400,11 @@
           }
         };
 
-        const setWeatherForecast = (list = [], hourly = []) => {
+        const setWeatherForecast = (list = [], hourly = [], meta = {}) => {
           state.settings.weatherForecast = list;
           if (hourly.length) state.settings.weatherHourly = hourly;
+          state.settings.weatherTimezone = meta.timezone || state.settings.weatherTimezone || '';
+          state.settings.weatherTimezoneLabel = meta.timezoneLabel || state.settings.weatherTimezoneLabel || '';
           save();
           renderWeatherNow();
           renderCalendar();
@@ -2398,7 +2472,10 @@
             wind: hWind[idx],
           }));
 
-          setWeatherForecast(list, hourly);
+          setWeatherForecast(list, hourly, {
+            timezone: data.timezone || '',
+            timezoneLabel: data.timezone_abbreviation || data.timezone || '',
+          });
           return list;
         };
 
@@ -2532,8 +2609,9 @@
 
           paint();
 
-          modal.querySelector('.close').onclick = () => modal.remove();
-          modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
+          modal.onclick = (e) => { if (e.target === modal) close(); };
 
           modal.querySelectorAll('#pinPromptPad [data-key]').forEach(btn => {
             btn.onclick = () => {
@@ -2551,7 +2629,7 @@
           });
 
           const finish = (nextMode, pinVal) => {
-            modal.remove();
+            close();
             pendingGatePin = pinVal || '';
             if (els.passStatus && state.settings.passcode) els.passStatus.textContent = maskPin(state.settings.passcode);
             save();
@@ -2595,10 +2673,114 @@
           return `${y}-${m}-${day}`;
         }
 
+        function getAppNow() {
+          return new Date();
+        }
+
+        function getAppTodayIso() {
+          return fmtDate(getAppNow());
+        }
+
         function parseDate(iso) {
           const [y, m, d] = iso.split('-').map(Number);
           return new Date(y, m - 1, d);
         }
+
+        function getDateTimePartsInZone(date = new Date(), timeZone = '') {
+          const fallback = {
+            year: String(date.getFullYear()),
+            month: String(date.getMonth() + 1).padStart(2, '0'),
+            day: String(date.getDate()).padStart(2, '0'),
+            hour: String(date.getHours()).padStart(2, '0'),
+            minute: String(date.getMinutes()).padStart(2, '0'),
+          };
+          if (!timeZone) return fallback;
+          try {
+            const formatter = new Intl.DateTimeFormat('en-CA', {
+              timeZone,
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hourCycle: 'h23',
+            });
+            const map = {};
+            formatter.formatToParts(date).forEach(part => {
+              if (part.type !== 'literal') map[part.type] = part.value;
+            });
+            return {
+              year: map.year || fallback.year,
+              month: map.month || fallback.month,
+              day: map.day || fallback.day,
+              hour: map.hour || fallback.hour,
+              minute: map.minute || fallback.minute,
+            };
+          } catch (err) {
+            return fallback;
+          }
+        }
+
+        function getWeatherClock() {
+          const timeZone = state.settings.weatherTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
+          const parts = getDateTimePartsInZone(new Date(), timeZone);
+          return {
+            timeZone,
+            date: `${parts.year}-${parts.month}-${parts.day}`,
+            hour: Number(parts.hour || 0),
+            hourKey: `${parts.year}-${parts.month}-${parts.day}T${parts.hour}`,
+          };
+        }
+
+        function removeOverlayHistoryEntry(token) {
+          const index = overlayHistoryStack.findIndex(item => item.token === token);
+          if (index >= 0) overlayHistoryStack.splice(index, 1);
+        }
+
+        function bindModalLifecycle(modal, onClose) {
+          const token = `overlay-${++overlayHistorySeq}`;
+          let closed = false;
+
+          const finalize = () => {
+            if (closed) return;
+            closed = true;
+            removeOverlayHistoryEntry(token);
+            if (typeof onClose === 'function') onClose();
+            if (modal?.isConnected) modal.remove();
+            document.removeEventListener('keydown', onKeydown);
+          };
+
+          const close = ({ fromHistory = false, consumeHistory = true } = {}) => {
+            if (closed) return;
+            const isTop = overlayHistoryStack[overlayHistoryStack.length - 1]?.token === token;
+            if (fromHistory || !consumeHistory || !isTop) {
+              finalize();
+              return;
+            }
+            suppressNextOverlayPop += 1;
+            history.back();
+            finalize();
+          };
+
+          const onKeydown = evt => {
+            if (evt.key === 'Escape') close();
+          };
+
+          overlayHistoryStack.push({ token, modal, close });
+          history.pushState({ ...(history.state || {}), __personaOverlay: token }, '', location.href);
+          document.addEventListener('keydown', onKeydown);
+          return close;
+        }
+
+        window.addEventListener('popstate', () => {
+          if (suppressNextOverlayPop > 0) {
+            suppressNextOverlayPop -= 1;
+            return;
+          }
+          const top = overlayHistoryStack[overlayHistoryStack.length - 1];
+          if (!top) return;
+          top.close({ fromHistory: true, consumeHistory: false });
+        });
 
         function maskPin(pin) {
           const digits = String(pin || '').trim();
@@ -2792,7 +2974,7 @@
         };
 
         const stripWeather = (settings) => {
-          const { weatherLocation, weatherLat, weatherLon, weatherForecast, weatherHourly, ...rest } = settings || {};
+          const { weatherLocation, weatherLat, weatherLon, weatherTimezone, weatherTimezoneLabel, weatherForecast, weatherHourly, ...rest } = settings || {};
           return rest;
         };
 
@@ -3027,7 +3209,7 @@
         }
 
         function collectTodayTaskGroupsFromTasks(tasks = [], username = '你') {
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           const grouped = new Map();
 
           tasks.forEach(task => {
@@ -3101,14 +3283,14 @@
         }
 
         function getTodayMoodEntry(moods = []) {
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           return (moods || [])
             .filter(item => item && item.date === todayIso)
             .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
         }
 
         function upsertTodayMood(moodKey) {
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           const idx = state.moods.findIndex(item => item?.date === todayIso);
           const payload = {
             date: todayIso,
@@ -3127,13 +3309,13 @@
         }
 
         function collectTodayMoodEntries(moods = []) {
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           return (moods || []).filter(item => item && item.date === todayIso && item.mood);
         }
 
         function syncTodayMoodToLocal(entry) {
           if (!entry || !entry.mood) return false;
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           if (entry.date !== todayIso) return false;
           const localEntry = getTodayMoodEntry(state.moods);
           const remoteTime = Number(entry.createdAt || 0);
@@ -3484,9 +3666,23 @@
                 <div class="social-side">
                   <div class="social-card social-kpis" id="tpMoodKpis"></div>
                   <div class="mood-side" id="tpMoodPanel">
-                    <div id="tpMoodPickerWrap">
-                      <div class="mood-panel-title">记录今天的心情</div>
-                      <p>点一下保存之后，这一块会直接切成剪报海报云图。</p>
+                    <div id="tpMoodComposer">
+                      <div class="mood-poster-tag" aria-label="TODAY FEELING">
+                        <span class="tag-cut">T</span>
+                        <span class="tag-cut">O</span>
+                        <span class="tag-cut">D</span>
+                        <span class="tag-cut">A</span>
+                        <span class="tag-cut">Y</span>
+                        <span class="tag-space" aria-hidden="true"></span>
+                        <span class="tag-cut">F</span>
+                        <span class="tag-cut">E</span>
+                        <span class="tag-cut">E</span>
+                        <span class="tag-cut">L</span>
+                        <span class="tag-cut">I</span>
+                        <span class="tag-cut">N</span>
+                        <span class="tag-cut">G</span>
+                      </div>
+                      <p id="tpMoodHint">先选一个今天的心情，提交后这里会直接变成云图。</p>
                       <div class="mood-picker" id="tpMoodPicker"></div>
                       <button class="primary mood-save" id="tpMoodSave">保存今天状态</button>
                     </div>
@@ -3529,15 +3725,15 @@
             </div>
           `;
 
-          const close = () => {
+          const close = bindModalLifecycle(modal, () => {
             stopCloudPhysics(cloudEl);
             stopCloudPhysics(pointStageEl);
-            modal.remove();
-          };
+          });
           const statusEl = modal.querySelector('#tpStatus');
           const moodKpisEl = modal.querySelector('#tpMoodKpis');
           const moodPanelEl = modal.querySelector('#tpMoodPanel');
-          const pickerWrapEl = modal.querySelector('#tpMoodPickerWrap');
+          const composerEl = modal.querySelector('#tpMoodComposer');
+          const moodHintEl = modal.querySelector('#tpMoodHint');
           const posterEl = modal.querySelector('#tpMoodPoster');
           const pickerEl = modal.querySelector('#tpMoodPicker');
           const saveMoodBtn = modal.querySelector('#tpMoodSave');
@@ -3555,9 +3751,12 @@
           let selectedMood = getTodayMoodEntry(state.moods)?.mood || MOOD_OPTIONS[0].key;
 
           const toggleMoodPanel = saved => {
-            pickerWrapEl.hidden = saved;
+            composerEl.hidden = !!saved;
             posterEl.hidden = !saved;
             moodPanelEl.classList.toggle('saved', saved);
+            if (moodHintEl) {
+              moodHintEl.textContent = '先选一个今天的心情，提交后这里会直接变成云图。';
+            }
           };
 
           const renderMoodPicker = () => {
@@ -3617,9 +3816,8 @@
             pointStatusEl.textContent = `${period === 'am' ? '上午' : '下午'} · ${sourceLabel} · 共 ${aggregate.totalPoints} 点`;
           };
 
-          modal.querySelector('.close').onclick = close;
+          modal.querySelector('.close').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
-          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
 
           switchEl.querySelectorAll('button').forEach(btn => {
             btn.onclick = () => renderPointStats(btn.dataset.period || 'am');
@@ -3816,7 +4014,7 @@
         }
 
         function taskDateLabel(task) {
-          const todayDate = new Date();
+          const todayDate = getAppNow();
           const today = fmtDate(todayDate);
           if (task.date === today) return '今天';
           const diff = (parseDate(task.date) - todayDate) / (1000 * 60 * 60 * 24);
@@ -3828,16 +4026,17 @@
         const typeFromImportance = (imp) => (imp === '低' ? 'side' : 'main');
 
         function renderTasks() {
-          const taskKey = state.tasks.map(t => `${t.id}|${t.status}|${t.date}|${t.title||''}|${t.time||''}|${t.location||''}|${t.type||''}|${t.importance||''}|${t.dimension||''}|${t.groupId||''}`).join('~');
+          const selectedIso = fmtDate(state.selectedDate || getAppNow());
+          const taskKey = `${selectedIso}::${state.tasks.map(t => `${t.id}|${t.status}|${t.date}|${t.title||''}|${t.time||''}|${t.location||''}|${t.type||''}|${t.importance||''}|${t.dimension||''}|${t.groupId||''}`).join('~')}`;
           if (taskKey === lastTasksKey) return;
           lastTasksKey = taskKey;
 
-          const today = fmtDate(new Date());
+          const today = getAppTodayIso();
           const importanceOrder = { '高': 0, '中': 1, '低': 2 };
           const list = state.tasks.slice().sort((a, b) => {
-            const aToday = a.date === today ? 0 : 1;
-            const bToday = b.date === today ? 0 : 1;
-            if (aToday !== bToday) return aToday - bToday; // 今日任务优先
+            const aSelected = a.date === selectedIso ? 0 : 1;
+            const bSelected = b.date === selectedIso ? 0 : 1;
+            if (aSelected !== bSelected) return aSelected - bSelected; // 当前选中日期优先
             const ia = importanceOrder[a.importance] ?? 1;
             const ib = importanceOrder[b.importance] ?? 1;
             if (ia !== ib) return ia - ib; // 高优先级在前
@@ -3880,7 +4079,7 @@
             if (!arr.length) {
               const empty = document.createElement('div');
               empty.style.color = 'var(--muted)';
-              empty.textContent = '暂无任务，可用闪投快速创建。';
+              empty.textContent = '暂无任务';
               container.appendChild(empty);
               return;
             }
@@ -3940,20 +4139,35 @@
             };
 
             if (isMain) {
-              const todayPending = pending.filter(t => t.date === today);
-              const otherPending = pending.filter(t => t.date !== today);
-              if (todayPending.length) {
-                const { wrap, body } = createShelf('今天 · 主线', todayPending.length, true);
+              const selectedPending = pending.filter(t => t.date === selectedIso);
+              const otherPending = pending.filter(t => t.date !== selectedIso);
+              const selectedLabel = selectedIso === today ? '今天 · 主线' : `${selectedIso} · 主线`;
+              const otherLabel = selectedIso === today ? '非今天 · 主线' : '其他日期 · 主线';
+              if (selectedPending.length) {
+                const { wrap, body } = createShelf(selectedLabel, selectedPending.length, true);
                 container.appendChild(wrap);
-                todayPending.forEach(task => renderTask(task, false, body));
+                selectedPending.forEach(task => renderTask(task, false, body));
               }
               if (otherPending.length) {
-                const { wrap, body } = createShelf('非今天 · 主线', otherPending.length, false);
+                const { wrap, body } = createShelf(otherLabel, otherPending.length, false);
                 container.appendChild(wrap);
                 otherPending.forEach(task => renderTask(task, false, body));
               }
             } else {
-              pending.forEach(task => renderTask(task, false, container));
+              const selectedPending = pending.filter(t => t.date === selectedIso);
+              const otherPending = pending.filter(t => t.date !== selectedIso);
+              const selectedLabel = selectedIso === today ? '今天 · 支线' : `${selectedIso} · 支线`;
+              const otherLabel = selectedIso === today ? '非今天 · 支线' : '其他日期 · 支线';
+              if (selectedPending.length) {
+                const { wrap, body } = createShelf(selectedLabel, selectedPending.length, true);
+                container.appendChild(wrap);
+                selectedPending.forEach(task => renderTask(task, false, body));
+              }
+              if (otherPending.length) {
+                const { wrap, body } = createShelf(otherLabel, otherPending.length, false);
+                container.appendChild(wrap);
+                otherPending.forEach(task => renderTask(task, false, body));
+              }
             }
 
             if (done.length) {
@@ -3981,6 +4195,20 @@
           if (lastSelectedDayEl && lastSelectedDayEl !== newEl) lastSelectedDayEl.classList.remove('selected');
           if (newEl) newEl.classList.add('selected');
           lastSelectedDayEl = newEl;
+        }
+
+        function updateReturnTodayButton() {
+          if (!els.returnTodayBtn) return;
+          const selectedIso = fmtDate(state.selectedDate || getAppNow());
+          const isToday = selectedIso === getAppTodayIso();
+          els.returnTodayBtn.classList.toggle('hidden', isToday);
+          updateReturnTodayButtonPosition();
+        }
+
+        function updateReturnTodayButtonPosition() {
+          if (!els.returnTodayBtn) return;
+          const visualTop = window.visualViewport?.offsetTop || 0;
+          els.returnTodayBtn.style.setProperty('--return-today-offset-y', `${Math.max(0, visualTop)}px`);
         }
 
         function renderCalendar() {
@@ -4016,11 +4244,14 @@
               state.selectedDate = date;
               save();
               updateCalendarSelection(dayEl);
+              updateReturnTodayButton();
               renderTasks();
               renderWeatherNow();
             };
             els.calendar.appendChild(dayEl);
           }
+
+          updateReturnTodayButton();
         }
 
         function openDayModal(dateIso) {
@@ -4050,11 +4281,10 @@
             </div>
           `;
 
-          const close = () => modal.remove();
-          modal.querySelector('.close').onclick = close;
-          modal.querySelector('#dayClose').onclick = close;
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
+          modal.querySelector('#dayClose').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
-          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
 
           const listEl = modal.querySelector('#dayList');
           if (!tasks.length) {
@@ -4114,8 +4344,8 @@
               </div>
             </div>
           `;
-          const close = () => modal.remove();
-          modal.querySelector('.close').onclick = close;
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
           modal.querySelector('#dEdit').onclick = () => { close(); openTaskModal(task, { presetDate: task.date }); };
           const completeBtn = modal.querySelector('#dComplete');
@@ -4168,11 +4398,10 @@
             </div>
           `;
 
-          const close = () => modal.remove();
-          modal.querySelector('.close').onclick = close;
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
           modal.querySelector('#cCancel').onclick = close;
-          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
 
           let imgData = task.evidenceImage || '';
           const preview = modal.querySelector('#cPreview');
@@ -4214,7 +4443,7 @@
 
         async function aiSuggestTask(text, imgData) {
           setLoading(true, 'AI 规划中...');
-          const todayIso = fmtDate(new Date());
+          const todayIso = getAppTodayIso();
           const { apiUrl, apiKey, modelName } = state.settings;
 
           const defaultPlannedGains = () => ({ knowledge: 1, proficiency: 1 });
@@ -4319,7 +4548,7 @@
               const arr = Array.isArray(input) ? input : (input ? [input] : []);
               const localDates = parseLocalDates(rawText || '');
               const picked = localDates.length ? localDates : arr;
-              if (!picked.length) return [fmtDate(new Date())];
+              if (!picked.length) return [getAppTodayIso()];
               const uniq = Array.from(new Set(picked)).sort();
               return uniq;
             };
@@ -4595,10 +4824,9 @@
             </div>
           `;
 
-          const close = () => modal.remove();
-          modal.querySelector('.close').onclick = close;
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
-          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
 
           const aiView = modal.querySelector('#aiView');
           const formView = modal.querySelector('#formView');
@@ -4916,10 +5144,9 @@
               <button class="primary" id="qSubmit">生成并填充</button>
             </div>
           `;
-          const close = () => modal.remove();
-          modal.querySelector('.close').onclick = close;
+          const close = bindModalLifecycle(modal);
+          modal.querySelector('.close').onclick = () => close();
           modal.onclick = e => { if (e.target === modal) close(); };
-          document.addEventListener('keydown', function esc(evt){ if (evt.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
 
           const evidenceWrap = modal.querySelector('#qEvidenceWrap');
           const evidenceInput = modal.querySelector('#qEvidence');
@@ -4946,7 +5173,7 @@
             if (mode === 'done') {
               const importance = suggestion.importance || '中';
               const type = typeFromImportance(importance);
-              const date = fmtDate(new Date());
+              const date = getAppTodayIso();
               const baseTask = {
                 title: suggestion.title || desc.slice(0, 30) || '今日完成',
                 description: suggestion.description || desc,
@@ -4980,7 +5207,7 @@
               await evaluateTask(task.id);
             } else {
               close();
-              openTaskModal(undefined, { presetDate: suggestion.date || fmtDate(new Date()), suggestion });
+              openTaskModal(undefined, { presetDate: suggestion.date || getAppTodayIso(), suggestion });
             }
           };
 
@@ -5041,7 +5268,7 @@
 
           try {
             const levels = currentLevels();
-            const todayIso = fmtDate(new Date());
+            const todayIso = getAppTodayIso();
             const parseJSONSafe = (text) => {
               if (!text) return {};
               const cleaned = text.replace(/```[a-zA-Z]*\s*([\s\S]*?)```/g, '$1').trim();
@@ -5493,6 +5720,17 @@
           };
 
           els.quickBtn.onclick = () => openQuickModal();
+          if (els.returnTodayBtn) {
+            els.returnTodayBtn.onclick = () => {
+              const today = getAppNow();
+              state.selectedDate = today;
+              state.monthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
+              save();
+              renderCalendar();
+              renderTasks();
+              renderWeatherNow();
+            };
+          }
           if (els.todayPointCloudBtn) els.todayPointCloudBtn.onclick = () => openTodayPointModal();
         }
 
@@ -5583,6 +5821,15 @@
               updateCloudStatus('尝试同步云端...');
               loadRemote();
             }
+          }
+
+          updateReturnTodayButton();
+          updateReturnTodayButtonPosition();
+          window.addEventListener('scroll', updateReturnTodayButtonPosition, { passive: true });
+          window.addEventListener('resize', updateReturnTodayButtonPosition);
+          if (window.visualViewport) {
+            window.visualViewport.addEventListener('scroll', updateReturnTodayButtonPosition);
+            window.visualViewport.addEventListener('resize', updateReturnTodayButtonPosition);
           }
 
           // 预取天气
