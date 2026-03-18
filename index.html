@@ -1351,6 +1351,7 @@
     .hour-chip { min-width:58px; padding:6px; border:1px solid #24222c; border-radius:10px; background:#0f0e15; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; box-shadow:1px 1px 0 #000; transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease; }
     .hour-chip .h-temp { font-weight:700; }
     .hour-chip .h-time { color: var(--muted); font-size:11px; }
+    .hour-chip .h-precip { font-size:10px; color:#8bc4ff; line-height:1; white-space:nowrap; }
     .hour-chip.current {
       border-color: #b00020;
       background: linear-gradient(180deg, rgba(176,0,32,0.18) 0%, rgba(176,0,32,0.08) 100%), #141218;
@@ -2333,6 +2334,81 @@
           return hourly.length - 1;
         };
 
+        const weatherCodePriority = (code) => {
+          const value = Number(code);
+          if (!Number.isFinite(value)) return 0;
+          if ([95, 96, 99].includes(value)) return 900 + value;
+          if ([85, 86].includes(value)) return 860 + value;
+          if ([71, 73, 75, 77].includes(value)) return 820 + value;
+          if ([66, 67].includes(value)) return 780 + value;
+          if ([80, 81, 82].includes(value)) return 760 + value;
+          if ([61, 63, 65].includes(value)) return 740 + value;
+          if ([56, 57].includes(value)) return 720 + value;
+          if ([51, 53, 55].includes(value)) return 700 + value;
+          if ([45, 48].includes(value)) return 420 + value;
+          if (value === 3) return 320;
+          if (value === 2) return 240;
+          if (value === 1) return 160;
+          if (value === 0) return 100;
+          return 40;
+        };
+
+        const isActiveWeatherCode = (code) => weatherCodePriority(code) >= 700;
+
+        const resolveWeatherCode = (code, precip) => {
+          const value = Number(code);
+          const precipValue = Number(precip);
+          if (isActiveWeatherCode(value)) return value;
+          if (!Number.isFinite(precipValue)) return value;
+          if (precipValue >= 85) return 63;
+          if (precipValue >= 60) return 61;
+          if (precipValue >= 35) return 51;
+          return value;
+        };
+
+        const normalizeDailyWeatherForecast = (list = [], hourly = []) => list.map((item) => {
+          const dayHours = hourly.filter(h => h.date === item.date);
+          if (!dayHours.length) return item;
+
+          const validCodes = dayHours.filter(h => Number.isFinite(Number(h.code)));
+          const precipValues = dayHours.map(h => Number(h.precip)).filter(Number.isFinite);
+          const windValues = dayHours.map(h => Number(h.wind)).filter(Number.isFinite);
+
+          let code = resolveWeatherCode(item.code, item.precip);
+          const notableHours = validCodes.filter(h => isActiveWeatherCode(resolveWeatherCode(h.code, h.precip)) && (Number.isFinite(Number(h.precip)) ? Number(h.precip) >= 35 : true));
+          if (notableHours.length) {
+            code = notableHours.reduce((best, entry) => {
+              const entryCode = resolveWeatherCode(entry.code, entry.precip);
+              const bestCode = resolveWeatherCode(best.code, best.precip);
+              const entryPriority = weatherCodePriority(entryCode);
+              const bestPriority = weatherCodePriority(bestCode);
+              if (entryPriority !== bestPriority) return entryPriority > bestPriority ? entry : best;
+              return Number(entry.precip || 0) >= Number(best.precip || 0) ? entry : best;
+            }, null);
+            code = resolveWeatherCode(code?.code, code?.precip);
+          } else if (validCodes.length) {
+            const counts = new Map();
+            validCodes.forEach((entry) => {
+              const resolvedCode = resolveWeatherCode(entry.code, entry.precip);
+              const current = counts.get(resolvedCode) || { count: 0, code: resolvedCode };
+              current.count += 1;
+              counts.set(resolvedCode, current);
+            });
+            code = Array.from(counts.values()).reduce((best, entry) => {
+              if (!best) return entry;
+              if (entry.count !== best.count) return entry.count > best.count ? entry : best;
+              return weatherCodePriority(entry.code) >= weatherCodePriority(best.code) ? entry : best;
+            }, null)?.code ?? item.code;
+          }
+
+          return {
+            ...item,
+            code,
+            precip: precipValues.length ? Math.max(...precipValues) : item.precip,
+            wind: windValues.length ? Math.max(...windValues) : item.wind,
+          };
+        });
+
         const renderWeatherNow = () => {
           const box = els.weatherNow;
           if (!box) return;
@@ -2364,7 +2440,7 @@
             return;
           }
 
-          const info = weatherInfo(currentHourEntry?.code ?? forecast.code);
+          const info = weatherInfo(resolveWeatherCode(currentHourEntry?.code ?? forecast.code, currentHourEntry?.precip ?? forecast.precip));
           const temp = `${Math.round(forecast.min)}°/${Math.round(forecast.max)}°`;
           const alert = info.extreme ? `<span class="weather-alert">⚠ ${info.label}</span>` : '';
           const weekdayLabel = weekdays[parseDate(selectedIso).getDay()];
@@ -2373,19 +2449,20 @@
             forecast.precip != null ? `降水 ${Math.round(forecast.precip)}%` : '',
             forecast.wind != null ? `风速 ${Math.round(forecast.wind)} km/h` : '',
           ].filter(Boolean).join(' · ');
-          const nowChip = currentHourEntry ? `<span class="w-nowchip">当地现在 ${String(currentHour).padStart(2, '0')}时 · ${currentHourEntry.temp != null ? `${Math.round(currentHourEntry.temp)}°` : '--'} · ${weatherInfo(currentHourEntry.code).label}</span>` : '';
+              const nowChip = currentHourEntry ? `<span class="w-nowchip">当地现在 ${String(currentHour).padStart(2, '0')}时 · ${currentHourEntry.temp != null ? `${Math.round(currentHourEntry.temp)}°` : '--'} · ${weatherInfo(resolveWeatherCode(currentHourEntry.code, currentHourEntry.precip)).label}</span>` : '';
 
           const hourlyHtml = hourlyDisplay.length
             ? `<div class="weather-hourly">${hourlyDisplay.map((h, idx) => {
-                const hi = weatherInfo(h.code);
+                const hi = weatherInfo(resolveWeatherCode(h.code, h.precip));
                 const hourValue = parseWeatherHourValue(h);
                 const tag = `${Number.isFinite(hourValue) ? String(hourValue).padStart(2, '0') : (h.hour || '--')}时`;
                 const hTemp = h.temp != null ? `${Math.round(h.temp)}°` : '--';
+                const hPrecip = Number.isFinite(Number(h.precip)) && Number(h.precip) > 0 ? `<span class="h-precip">降水${Math.round(h.precip)}%</span>` : '';
                 const isNow = isWeatherToday && idx === 0;
                 const currentStyle = isNow ? ' style="border-color:#b00020;background:linear-gradient(180deg, rgba(176,0,32,0.2) 0%, rgba(176,0,32,0.08) 100%), #141218;box-shadow:0 0 0 1px rgba(176,0,32,0.34) inset, 0 0 14px rgba(176,0,32,0.32), 2px 2px 0 #000;transform:translateY(-1px);"' : '';
                 const timeStyle = isNow ? ' style="color:#ffb7c2;"' : '';
                 const tempStyle = isNow ? ' style="color:#ffb7c2;"' : '';
-                return `<div class="hour-chip${isNow ? ' current' : ''}" data-idx="${idx}"${currentStyle}><span class="h-time"${timeStyle}>${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp"${tempStyle}>${hTemp}</span>${isNow ? '<span class="h-now">现在</span>' : ''}</div>`;
+                return `<div class="hour-chip${isNow ? ' current' : ''}" data-idx="${idx}"${currentStyle}><span class="h-time"${timeStyle}>${tag}</span><span class="w-icon">${hi.icon}</span><span class="h-temp"${tempStyle}>${hTemp}</span>${hPrecip}${isNow ? '<span class="h-now">现在</span>' : ''}</div>`;
               }).join('')}</div>`
             : `<div class="weather-hourly" style="opacity:0.7;">无小时预报</div>`;
 
@@ -2404,7 +2481,8 @@
         };
 
         const setWeatherForecast = (list = [], hourly = [], meta = {}) => {
-          state.settings.weatherForecast = list;
+          const nextHourly = hourly.length ? hourly : (state.settings.weatherHourly || []);
+          state.settings.weatherForecast = normalizeDailyWeatherForecast(list, nextHourly);
           if (hourly.length) state.settings.weatherHourly = hourly;
           state.settings.weatherTimezone = meta.timezone || state.settings.weatherTimezone || '';
           state.settings.weatherTimezoneLabel = meta.timezoneLabel || state.settings.weatherTimezoneLabel || '';
@@ -2479,13 +2557,13 @@
             timezone: data.timezone || '',
             timezoneLabel: data.timezone_abbreviation || data.timezone || '',
           });
-          return list;
+          return normalizeDailyWeatherForecast(list, hourly);
         };
 
         const dayWeatherTag = (iso) => {
           const w = (state.settings.weatherForecast || []).find(d => d.date === iso);
           if (!w) return '';
-          const info = weatherInfo(w.code);
+          const info = weatherInfo(resolveWeatherCode(w.code, w.precip));
           // Calendar keeps compact: only icon, no temp to avoid layout shifts
           return `<div class="weather-tag"><span class="w-icon">${info.icon}</span><span class="w-mini-temp">${Math.round(w.max)}°/${Math.round(w.min)}°</span></div>`;
         };
