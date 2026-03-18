@@ -2922,7 +2922,16 @@
         function saveLocal() {
           const payload = { ...state, selectedDate: fmtDate(state.selectedDate), monthCursor: fmtDate(state.monthCursor), lastUpdated: Number(state.lastUpdated || Date.now()), clientId };
           state.lastUpdated = payload.lastUpdated;
-          localStorage.setItem('persona-planner', JSON.stringify(payload));
+          try {
+            localStorage.setItem('persona-planner', JSON.stringify(payload));
+          } catch (err) {
+            console.error('本地保存失败', err);
+            const message = err?.name === 'QuotaExceededError'
+              ? '本地存储空间不足，图片可能过大。系统已阻止闪退，请换更小的图片或重试。'
+              : `本地保存失败：${err?.message || '未知错误'}`;
+            updateCloudStatus(message, true);
+            window.alert(message);
+          }
         }
 
         const saveLocalDebounced = debounce(() => saveLocal(), 300);
@@ -4498,16 +4507,18 @@
           const preview = modal.querySelector('#cPreview');
           const imgInput = modal.querySelector('#cImg');
           if (imgInput) {
-            imgInput.onchange = e => {
+            imgInput.onchange = async e => {
               const file = e.target.files?.[0];
               if (!file) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                imgData = reader.result;
+              try {
+                imgData = await fileToDataURL(file);
                 preview.style.display = 'grid';
                 preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>${file.name}</div>`;
-              };
-              reader.readAsDataURL(file);
+              } catch (err) {
+                console.error('图片处理失败', err);
+                alert(`图片处理失败：${err.message}`);
+                e.target.value = '';
+              }
             };
           }
 
@@ -5063,7 +5074,18 @@
           let aiImgData = '';
           if (aiImgEl) aiImgEl.onchange = async e => {
             const file = e.target.files?.[0];
-            aiImgData = file ? await fileToDataURL(file) : '';
+            if (!file) {
+              aiImgData = '';
+              return;
+            }
+            try {
+              aiImgData = await fileToDataURL(file);
+            } catch (err) {
+              console.error('AI 图片处理失败', err);
+              aiImgData = '';
+              alert(`图片处理失败：${err.message}`);
+              e.target.value = '';
+            }
           };
 
           if (aiBtn) aiBtn.onclick = async () => {
@@ -5087,16 +5109,18 @@
               preview.style.display = 'grid';
               preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>已选择图片</div>`;
             }
-            imgInput.onchange = e => {
+            imgInput.onchange = async e => {
               const file = e.target.files?.[0];
               if (!file) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                imgData = reader.result;
+              try {
+                imgData = await fileToDataURL(file);
                 preview.style.display = 'grid';
                 preview.innerHTML = `<img src="${imgData}" alt="evidence"><div>${file.name}</div>`;
-              };
-              reader.readAsDataURL(file);
+              } catch (err) {
+                console.error('图片处理失败', err);
+                alert(`图片处理失败：${err.message}`);
+                e.target.value = '';
+              }
             };
           }
 
@@ -5811,13 +5835,66 @@
           if (els.todayPointCloudBtn) els.todayPointCloudBtn.onclick = () => openTodayPointModal();
         }
 
-        function fileToDataURL(file) {
+        function readFileAsDataURL(file) {
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
+            reader.onerror = () => reject(reader.error || new Error('读取图片失败'));
             reader.readAsDataURL(file);
           });
+        }
+
+        function loadImageFromDataURL(dataUrl) {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('图片解码失败'));
+            img.src = dataUrl;
+          });
+        }
+
+        async function compressImageDataURL(dataUrl, options = {}) {
+          const {
+            maxWidth = 1600,
+            maxHeight = 1600,
+            maxBytes = 360 * 1024,
+            qualityStart = 0.86,
+            qualityMin = 0.5,
+          } = options;
+          const image = await loadImageFromDataURL(dataUrl);
+          const width = image.naturalWidth || image.width;
+          const height = image.naturalHeight || image.height;
+          if (!width || !height) return dataUrl;
+
+          const scale = Math.min(1, maxWidth / width, maxHeight / height);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(width * scale));
+          canvas.height = Math.max(1, Math.round(height * scale));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return dataUrl;
+          ctx.fillStyle = '#111';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          let quality = qualityStart;
+          let output = canvas.toDataURL('image/jpeg', quality);
+          while (output.length > maxBytes * 1.37 && quality > qualityMin) {
+            quality = Math.max(qualityMin, quality - 0.08);
+            output = canvas.toDataURL('image/jpeg', quality);
+          }
+          return output;
+        }
+
+        async function fileToDataURL(file) {
+          const raw = await readFileAsDataURL(file);
+          const type = (file?.type || '').toLowerCase();
+          const size = Number(file?.size || 0);
+          if (!raw) return '';
+          if (!type.startsWith('image/')) return raw;
+          if (type.includes('svg')) return raw;
+          if (type.includes('gif') && size <= 320 * 1024) return raw;
+          if (size <= 280 * 1024 && raw.length <= 380 * 1024) return raw;
+          return compressImageDataURL(raw);
         }
 
         function animateTitleQuad() {
