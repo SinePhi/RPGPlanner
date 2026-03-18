@@ -1607,6 +1607,9 @@
       font-size: 18px;
       line-height: 1;
       text-align: center;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
     .today-fab:hover {
       border-color: #ffce00;
@@ -4211,6 +4214,16 @@
           els.returnTodayBtn.style.setProperty('--return-today-offset-y', `${Math.max(0, visualTop)}px`);
         }
 
+        function goToToday() {
+          const today = getAppNow();
+          state.selectedDate = today;
+          state.monthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
+          save();
+          renderCalendar();
+          renderTasks();
+          renderWeatherNow();
+        }
+
         function renderCalendar() {
           const cursor = state.monthCursor;
           const year = cursor.getFullYear();
@@ -5474,13 +5487,7 @@
 
         function bindEvents() {
           els.addToday.onclick = () => {
-            const today = new Date();
-            state.selectedDate = today;
-            state.monthCursor = today;
-            save();
-            renderCalendar();
-            renderTasks();
-            renderWeatherNow();
+            goToToday();
           };
           els.prevMonth.onclick = () => { state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() - 1, 1); save(); renderCalendar(); };
           els.nextMonth.onclick = () => { state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + 1, 1); save(); renderCalendar(); };
@@ -5721,15 +5728,7 @@
 
           els.quickBtn.onclick = () => openQuickModal();
           if (els.returnTodayBtn) {
-            els.returnTodayBtn.onclick = () => {
-              const today = getAppNow();
-              state.selectedDate = today;
-              state.monthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
-              save();
-              renderCalendar();
-              renderTasks();
-              renderWeatherNow();
-            };
+            els.returnTodayBtn.onclick = () => goToToday();
           }
           if (els.todayPointCloudBtn) els.todayPointCloudBtn.onclick = () => openTodayPointModal();
         }
